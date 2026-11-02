@@ -16,8 +16,8 @@ Instead of five emoji, you check in with two word clouds:
 
 Every word sits in a box of the same size and style, in a shuffled order, so no word is more suggestive than another.
 
-- **Insight**, at the top: one short sentence about your week, built from your reasons, e.g. "Too many meetings dragged this week down." It needs 3 check-ins in a week; early in the week it looks at last week. More patterns from the last 12 weeks are listed below it.
-- **My wall**: each brick is one of your workdays, coloured by how you felt and labelled with the word you picked most. Click a brick to see that day's feelings, reasons, typed reasons and week.
+- **Insight**, at the top: one short sentence about your week, built from your reasons, e.g. "Meetings drained you this week." It needs 3 check-ins in a week; early in the week it looks at last week. Below it, up to 3 short patterns from the last 12 weeks.
+- **My wall**: 2 weeks back, this week and 2 weeks ahead. Each brick is one of your workdays, coloured by how you felt and labelled with the word you picked most. Click a brick to see that day's feelings, reasons, typed reasons and week.
 - **Events**: add your own (releases, deadlines, holidays). They show on your wall and feed the patterns.
 
 There are no surprises (no gift box, no memes), no team goal and no team wall.

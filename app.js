@@ -3,7 +3,9 @@
 // Everything is saved only in this browser (localStorage). Nothing is sent anywhere, and there is no team view.
 
 const STORE = 'mbb-'; // A and B share a web address, so B's browser storage gets its own prefix
-const WEEKS_ON_WALL = 5;
+const WEEKS_BACK = 2; // the wall shows 2 weeks back, this week and 2 weeks ahead
+const WEEKS_AHEAD = 2;
+const SAMPLE_WEEKS = 5;
 const WEEKS_ANALYSED = 12; // patterns look at the last 12 weeks
 const MIN_FOR_INSIGHT = 3; // check-ins in a week before the insight says anything
 
@@ -108,14 +110,14 @@ function seededRandom(seed) {
 function makeSampleData() {
   const rand = seededRandom(42);
   const pick = (xs) => xs[Math.floor(rand() * xs.length)];
-  const firstMonday = addDays(mondayOf(new Date()), -7 * (WEEKS_ON_WALL - 1));
+  const firstMonday = addDays(mondayOf(new Date()), -7 * (SAMPLE_WEEKS - 1));
   const releases = [addDays(firstMonday, 7 + 3), addDays(firstMonday, 21 + 3)]; // Thursdays of weeks 2 and 4
   const events = releases.map((d) => ({ date: dayStr(d), label: 'Release' }));
   events.push({ date: dayStr(addDays(firstMonday, 14)), label: 'Sprint start' });
 
   const answers = [];
   const today = startOfDay(new Date());
-  for (let w = 0; w < WEEKS_ON_WALL; w++) {
+  for (let w = 0; w < SAMPLE_WEEKS; w++) {
     for (let wd = 0; wd < 5; wd++) {
       const d = addDays(firstMonday, w * 7 + wd);
       if (d >= today) continue; // up to yesterday, so today is yours
@@ -150,9 +152,17 @@ const SAMPLE_LOW_NOTES = ['Laptop is slow again', 'Waiting for a decision from a
 const SAMPLE = makeSampleData();
 
 // ---------- patterns ----------
+// Short names for reasons, so the insight and patterns stay short.
+const SHORT = {
+  'Too much work': 'Workload', 'Too many meetings': 'Meetings', 'Technical difficulties': 'Tech issues',
+  'Noise in the office': 'Office noise', 'Poor tooling': 'Poor tools', 'Deadline pressure': 'Deadlines',
+  'Personal reasons': 'Life outside work', 'Great teamwork': 'Teamwork', 'Finished something': 'Finishing things',
+  'Learning something new': 'Learning', 'Good feedback': 'Feedback', Other: 'Something else',
+};
+const short = (reason) => SHORT[reason] || reason;
+const lowerFirst = (s) => s[0].toLowerCase() + s.slice(1);
+
 const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
-const one = (x) => x.toFixed(1);
-const pct = (n, total) => `${Math.round((n / total) * 100)}%`;
 // [[name, count], …], most picked first
 const counts = (xs) => Object.entries(xs.reduce((m, x) => ({ ...m, [x]: (m[x] || 0) + 1 }), {})).sort((a, b) => b[1] - a[1]);
 
@@ -165,64 +175,33 @@ function nearEvents(events) {
   return near;
 }
 
+// Up to 3 short patterns, the most useful first.
 function findPatterns(answers, events) {
-  if (answers.length < 8) return ['Check in for a couple of weeks and more patterns show up here.'];
+  if (answers.length < 8) return ['Check in for 2 weeks to see patterns.'];
   const out = [];
   const overall = mean(answers.map((a) => a.score));
+  const byWeekday = {};
+  for (const a of answers) (byWeekday[parseDay(a.date).getDay()] ||= []).push(a);
 
-  // What's behind the low days, and when it comes up.
+  // What's behind your low days, and when it comes up most.
   const lows = answers.filter((a) => a.score <= 3);
   if (lows.length >= 4) {
     const [reason, n] = counts(lows.map((a) => a.reason))[0];
-    out.push(`Your top reason on low days is “${reason}” (${pct(n, lows.length)} of low check-ins).`);
+    out.push(`Low days: mostly ${lowerFirst(short(reason))}.`);
     const share = n / answers.length;
-    const byWeekday = {};
-    for (const a of answers) (byWeekday[parseDay(a.date).getDay()] ||= []).push(a);
     const peak = Object.entries(byWeekday)
       .filter(([, v]) => v.length >= 3)
       .map(([wd, v]) => ({ wd: Number(wd), hits: v.filter((a) => a.reason === reason).length, total: v.length }))
       .sort((a, b) => b.hits / b.total - a.hits / a.total)[0];
-    if (peak && peak.hits >= 2 && peak.hits / peak.total >= share * 1.5) {
-      out.push(`“${reason}” comes up most on ${WEEKDAYS[peak.wd]}s (${pct(peak.hits, peak.total)} of ${WEEKDAYS[peak.wd]} check-ins).`);
-    }
+    if (peak && peak.hits >= 2 && peak.hits / peak.total >= share * 1.5) out.push(`Peak ${lowerFirst(short(reason))}: ${WEEKDAYS[peak.wd]}s.`);
   }
 
-  const [topWord, topN] = counts(answers.map((a) => a.word))[0];
-  out.push(`You feel ${topWord} most often (${pct(topN, answers.length)} of check-ins).`);
-
-  const byWeekday = {};
-  for (const a of answers) (byWeekday[parseDay(a.date).getDay()] ||= []).push(a.score);
   const weekdays = Object.entries(byWeekday)
     .filter(([, v]) => v.length >= 3)
-    .map(([wd, v]) => ({ wd: Number(wd), avg: mean(v) }));
-  if (weekdays.length >= 3) {
-    const low = weekdays.reduce((a, b) => (b.avg < a.avg ? b : a));
-    const high = weekdays.reduce((a, b) => (b.avg > a.avg ? b : a));
-    if (overall - low.avg >= 0.3) out.push(`${WEEKDAYS[low.wd]}s are your toughest day (level ${one(low.avg)} vs ${one(overall)} overall).`);
-    if (high.avg - overall >= 0.3) out.push(`${WEEKDAYS[high.wd]}s feel best (level ${one(high.avg)}).`);
-  }
-
-  if (events.length) {
-    const near = nearEvents(events);
-    const nearOnes = answers.filter((a) => near.has(a.date));
-    const others = answers.filter((a) => !near.has(a.date));
-    if (nearOnes.length >= 3 && others.length >= 3) {
-      const diff = mean(others.map((a) => a.score)) - mean(nearOnes.map((a) => a.score));
-      const [nearWord] = counts(nearOnes.map((a) => a.word))[0];
-      const [otherWord] = counts(others.map((a) => a.word))[0];
-      const words = nearWord !== otherWord ? ` You pick ${nearWord} most then, against ${otherWord} the rest of the time.` : '';
-      if (diff >= 0.3) out.push(`You feel worse in the 2 days before your events and on the day (level ${one(mean(nearOnes.map((a) => a.score)))} vs ${one(mean(others.map((a) => a.score)))}).${words}`);
-      if (diff <= -0.3) out.push(`You feel better around your events (level ${one(mean(nearOnes.map((a) => a.score)))} vs ${one(mean(others.map((a) => a.score)))}).${words}`);
-    }
-  }
-
-  const morning = answers.filter((a) => a.hour < 12).map((a) => a.score);
-  const afternoon = answers.filter((a) => a.hour >= 12).map((a) => a.score);
-  if (morning.length >= 3 && afternoon.length >= 3) {
-    const diff = mean(morning) - mean(afternoon);
-    if (diff >= 0.3) out.push(`Your mornings feel better than your afternoons (level ${one(mean(morning))} vs ${one(mean(afternoon))}).`);
-    if (diff <= -0.3) out.push(`Your afternoons feel better than your mornings (level ${one(mean(afternoon))} vs ${one(mean(morning))}).`);
-  }
+    .map(([wd, v]) => ({ wd: Number(wd), avg: mean(v.map((a) => a.score)) }));
+  const low = weekdays.length >= 3 ? weekdays.reduce((a, b) => (b.avg < a.avg ? b : a)) : null;
+  const high = weekdays.length >= 3 ? weekdays.reduce((a, b) => (b.avg > a.avg ? b : a)) : null;
+  if (low && overall - low.avg >= 0.3) out.push(`Toughest day: ${WEEKDAYS[low.wd]}.`);
 
   const days = [...new Set(answers.map((a) => a.date))].sort();
   const recent = new Set(days.slice(-10));
@@ -230,19 +209,38 @@ function findPatterns(answers, events) {
   if (before.size >= 5) {
     const r = mean(answers.filter((a) => recent.has(a.date)).map((a) => a.score));
     const b = mean(answers.filter((a) => before.has(a.date)).map((a) => a.score));
-    if (r - b >= 0.3) out.push(`Trending up: your last 2 weeks are at level ${one(r)}, up from ${one(b)}.`);
-    if (b - r >= 0.3) out.push(`Trending down: your last 2 weeks are at level ${one(r)}, down from ${one(b)}.`);
+    if (r - b >= 0.3) out.push('Trending up.');
+    if (b - r >= 0.3) out.push('Trending down.');
   }
 
-  return out;
+  if (events.length) {
+    const near = nearEvents(events);
+    const nearOnes = answers.filter((a) => near.has(a.date)).map((a) => a.score);
+    const others = answers.filter((a) => !near.has(a.date)).map((a) => a.score);
+    if (nearOnes.length >= 3 && others.length >= 3) {
+      const diff = mean(others) - mean(nearOnes);
+      if (diff >= 0.3) out.push('Events drag you down.');
+      if (diff <= -0.3) out.push('Events lift you.');
+    }
+  }
+
+  if (high && high.avg - overall >= 0.3) out.push(`Best day: ${WEEKDAYS[high.wd]}.`);
+
+  const morning = answers.filter((a) => a.hour < 12).map((a) => a.score);
+  const afternoon = answers.filter((a) => a.hour >= 12).map((a) => a.score);
+  if (morning.length >= 3 && afternoon.length >= 3) {
+    const diff = mean(morning) - mean(afternoon);
+    if (diff >= 0.3) out.push('Mornings beat afternoons.');
+    if (diff <= -0.3) out.push('Afternoons beat mornings.');
+  }
+
+  out.push(`Most often: ${counts(answers.map((a) => a.word))[0][0]}.`);
+  return out.slice(0, 3);
 }
 
 // ---------- the insight: your week in one sentence, built from your reasons ----------
-const LIFTS = { 'Finished something': 'Finishing things', 'Personal reasons': 'Life outside work', Other: 'Something outside the list' };
-const DRAGS = { 'Personal reasons': 'Life outside work', Other: 'Something outside the list' };
-const lowerFirst = (s) => s[0].toLowerCase() + s.slice(1);
 // "Other" is named by what you typed, so the sentence reflects your own reason.
-const nameOf = (r, names) => (r.reason === 'Other' && r.notes.length ? `“${r.notes[r.notes.length - 1]}”` : names[r.reason] || r.reason);
+const nameOf = (r) => (r.reason === 'Other' && r.notes.length ? `“${r.notes[r.notes.length - 1]}”` : short(r.reason));
 
 // The reason that came up most in a group of check-ins; a tie goes to the one with the strongest feelings.
 function topReason(list, stronger) {
@@ -265,7 +263,7 @@ function insight(answers) {
   if (list.length < MIN_FOR_INSIGHT) {
     return {
       sentence: 'Your first insight is on its way.',
-      evidence: `Check in ${MIN_FOR_INSIGHT} times in a week to get it. This week so far: ${list.length}.`,
+      evidence: `Needs ${MIN_FOR_INSIGHT} check-ins in a week · ${list.length} so far`,
     };
   }
 
@@ -275,21 +273,11 @@ function insight(answers) {
   const lift = goods.length ? topReason(goods, (a, b) => b - a) : null;
   const week = lowerFirst(when);
   let sentence;
-  let shown;
-  if (lows.length >= 2 && goods.length >= 2) {
-    sentence = `${nameOf(lift, LIFTS)} lifted ${week}, but ${lowerFirst(nameOf(drag, DRAGS))} dragged it down.`;
-    shown = [lift, drag];
-  } else if (lows.length >= goods.length) {
-    sentence = `${nameOf(drag, DRAGS)} dragged ${week} down.`;
-    shown = [drag];
-  } else {
-    sentence = `${nameOf(lift, LIFTS)} lifted ${week}.`;
-    shown = [lift];
-  }
+  if (lows.length >= 2 && goods.length >= 2) sentence = `${nameOf(lift)} lifted you, ${lowerFirst(nameOf(drag))} drained you.`;
+  else if (lows.length >= goods.length) sentence = `${nameOf(drag)} drained you ${week}.`;
+  else sentence = `${nameOf(lift)} lifted you ${week}.`;
   const [topWord, topN] = counts(list.map((a) => a.word))[0];
-  const notes = shown.flatMap((r) => r.notes).slice(0, 2);
-  const evidence = `${when}: ${shown.map((r) => `“${r.reason}” in ${r.n}`).join(' and ')} of your ${list.length} check-ins.`
-    + `${topN > 1 ? ` Mostly ${topWord}.` : ''}${notes.length ? ` You wrote: ${notes.map((n) => `“${n}”`).join(', ')}.` : ''}`;
+  const evidence = `${when} · ${list.length} check-ins${topN > 1 ? ` · mostly ${topWord}` : ''}`;
   return { sentence, evidence };
 }
 
@@ -303,8 +291,8 @@ function wall(includeSample) {
   const thisMonday = mondayOf(new Date());
 
   const weeks = [];
-  for (let w = WEEKS_ON_WALL - 1; w >= 0; w--) {
-    const monday = addDays(thisMonday, -7 * w);
+  for (let w = -WEEKS_BACK; w <= WEEKS_AHEAD; w++) {
+    const monday = addDays(thisMonday, 7 * w);
     const days = [];
     for (let i = 0; i < 5; i++) {
       const date = dayStr(addDays(monday, i));
