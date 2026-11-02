@@ -26,9 +26,11 @@ service cloud.firestore {
     // ---------- Version B: a feeling word and a reason, from fixed lists ----------
     match /b_answers/{id} {
       allow read: if true;
-      allow create: if request.resource.data.keys().hasOnly(['date', 'hour', 'word', 'reason'])
+      allow create: if request.resource.data.keys().hasOnly(['date', 'hour', 'word', 'reason', 'note'])
         && request.resource.data.word in ['Happy', 'Excited', 'Proud', 'Content', 'Focused', 'Calm', 'Distracted', 'Tired', 'Bored', 'Anxious', 'Stressed', 'Disappointed', 'Frustrated', 'Overwhelmed', 'Angry', 'Hopeless']
-        && request.resource.data.reason in ['Too much work', 'Too many meetings', 'Technical difficulties', 'Noise in the office', 'Poor tooling', 'Deadline pressure', 'Unclear priorities', 'Waiting on others', 'Personal reasons', 'Something else', 'Great teamwork', 'Finished something', 'Learning something new', 'Focus time', 'Good feedback']
+        && request.resource.data.reason in ['Too much work', 'Too many meetings', 'Technical difficulties', 'Noise in the office', 'Poor tooling', 'Deadline pressure', 'Unclear priorities', 'Waiting on others', 'Personal reasons', 'Something else', 'Other', 'Great teamwork', 'Finished something', 'Learning something new', 'Focus time', 'Good feedback']
+        && (!('note' in request.resource.data) || (request.resource.data.reason == 'Other'
+          && request.resource.data.note is string && request.resource.data.note.size() > 0 && request.resource.data.note.size() <= 80))
         && request.resource.data.hour is int && request.resource.data.hour >= 0 && request.resource.data.hour <= 23
         && request.resource.data.date is string && request.resource.data.date.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}');
     }

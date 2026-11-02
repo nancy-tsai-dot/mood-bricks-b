@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mood Journey · Version B</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <header class="top">
@@ -74,6 +74,7 @@
       <div id="dayFeelings"></div>
       <h3>Reasons</h3>
       <div id="dayReasons"></div>
+      <div id="dayNotes"></div>
       <h3>That week</h3>
       <div class="week-chart" id="dayWeek"></div>
     </div>
@@ -87,6 +88,14 @@
         <p class="step" id="stepLabel"></p>
         <p class="q" id="question" tabindex="-1"></p>
         <div class="cloud" id="cloud"></div>
+        <form class="other" id="otherForm" hidden>
+          <label for="otherText">In your own words</label>
+          <div class="row">
+            <input id="otherText" autocomplete="off" placeholder="What’s going on?">
+            <button class="btn primary" id="otherSend" disabled>Send</button>
+          </div>
+          <p class="muted small">Everyone on the team can read this, so leave out names.</p>
+        </form>
         <button type="button" class="link" id="backBtn" hidden>← Pick a different word</button>
         <p class="msg" id="askMsg" role="status"></p>
       </div>
@@ -98,6 +107,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

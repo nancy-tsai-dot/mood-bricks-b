@@ -30,9 +30,10 @@ const LEVELS = [
   { level: 4, label: 'Good' }, { level: 5, label: 'Great' },
 ];
 const LOW_REASONS = ['Too much work', 'Too many meetings', 'Technical difficulties', 'Noise in the office', 'Poor tooling',
-  'Deadline pressure', 'Unclear priorities', 'Waiting on others', 'Personal reasons', 'Something else'];
+  'Deadline pressure', 'Unclear priorities', 'Waiting on others', 'Personal reasons', 'Other'];
 const GOOD_REASONS = ['Great teamwork', 'Finished something', 'Learning something new', 'Focus time', 'Good feedback',
-  'Personal reasons', 'Something else'];
+  'Personal reasons', 'Other'];
+const MAX_NOTE = 80; // "Other" comes with a short typed reason
 const levelOf = (word) => FEELINGS.find((f) => f.word === word)?.level;
 const reasonsFor = (word) => (levelOf(word) >= 4 ? GOOD_REASONS : LOW_REASONS); // "Too many meetings" makes no sense after "Happy"
 
@@ -164,10 +165,10 @@ function streakFor(days) {
   return n;
 }
 
-async function checkIn(word, reason) {
+async function checkIn(word, reason, note) {
   const now = new Date();
   const today = dayStr(now);
-  await addDoc(ANSWERS, { date: today, hour: now.getHours(), word, reason });
+  await addDoc(ANSWERS, { date: today, hour: now.getHours(), word, reason, ...(note ? { note } : {}) });
   const days = myDays();
   if (!days.includes(today)) {
     days.push(today);
@@ -216,12 +217,16 @@ function makeSampleData() {
         else if (untilRelease <= 2 && rand() < 0.6) reason = pick(['Deadline pressure', 'Too much work']);
         else if (wd === 0 && rand() < 0.6) reason = 'Too many meetings';
         else reason = pick(LOW_REASONS);
-        answers.push({ date: dayStr(d), hour, word, reason, score });
+        const notes = score >= 4 ? SAMPLE_GOOD_NOTES : SAMPLE_LOW_NOTES;
+        const note = reason === 'Other' ? notes[(w * 5 + wd + i) % notes.length] : undefined; // no extra rand(), so the wall stays the same
+        answers.push({ date: dayStr(d), hour, word, reason, note, score });
       }
     }
   }
   return { answers, events };
 }
+const SAMPLE_GOOD_NOTES = ['Sunny walk at lunch', 'Nice chat with a colleague', 'Fixed a bug that bugged me for weeks'];
+const SAMPLE_LOW_NOTES = ['Laptop is slow again', 'Waiting for a decision from above', 'Back pain from my chair'];
 const SAMPLE = makeSampleData();
 
 // ---------- patterns and the team goal ----------
@@ -352,6 +357,7 @@ function wall(includeSample) {
         avg,
         feelings,
         reasons: shown ? counts(list.map((a) => a.reason)) : null,
+        notes: shown ? list.filter((a) => a.note).map((a) => a.note) : null, // typed reasons, hidden on small days like everything else
         future: date > today,
         events: events.filter((e) => e.date === date).map((e) => e.label),
       });
@@ -402,10 +408,18 @@ function checkPing() {
 }
 
 // A word cloud: identical pill buttons, in a shuffled order so no word always comes first.
+// Every box gets the width of the longest word, so a short word doesn't look different.
 function cloud(words, onPick) {
-  $('#cloud').replaceChildren(...words.map((w) => el('button', {
+  const box = $('#cloud');
+  box.style.removeProperty('--word-width');
+  const buttons = words.map((w) => el('button', {
     type: 'button', className: 'word', textContent: w, onclick: () => onPick(w),
-  })));
+  }));
+  box.replaceChildren(...buttons);
+  const fontSize = parseFloat(getComputedStyle(buttons[0]).fontSize);
+  const widest = Math.max(...buttons.map((b) => b.offsetWidth)) + 1; // offsetWidth ignores the pop-in animation; +1 covers rounding
+  box.style.setProperty('--word-width', `${widest / fontSize}em`); // in em, so it scales with the phone font size
+  $('#otherForm').hidden = true;
   $('#question').focus(); // not the first word, so no word looks picked already
 }
 
@@ -421,9 +435,30 @@ function askReason(word) {
   $('#question').replaceChildren('What’s making you feel ', el('mark', { textContent: word.toLowerCase() }), '?');
   $('#backBtn').hidden = false;
   const reasons = reasonsFor(word);
-  const fixedEnd = ['Personal reasons', 'Something else']; // the catch-alls stay at the end
-  cloud([...shuffle(reasons.filter((r) => !fixedEnd.includes(r))), ...fixedEnd], (reason) => answer(word, reason));
+  const fixedEnd = ['Personal reasons', 'Other']; // the catch-alls stay at the end
+  cloud([...shuffle(reasons.filter((r) => !fixedEnd.includes(r))), ...fixedEnd], (reason) => {
+    if (reason === 'Other') askOther(word);
+    else answer(word, reason);
+  });
 }
+
+// "Other" opens a text box; the answer is sent with the typed reason.
+let otherWord = null;
+function askOther(word) {
+  otherWord = word;
+  $('#cloud').querySelectorAll('.word').forEach((b) => b.setAttribute('aria-pressed', String(b.textContent === 'Other')));
+  $('#otherText').value = '';
+  $('#otherSend').disabled = true;
+  $('#otherForm').hidden = false;
+  $('#otherText').focus();
+}
+$('#otherText').maxLength = MAX_NOTE;
+$('#otherText').addEventListener('input', () => { $('#otherSend').disabled = !$('#otherText').value.trim(); });
+$('#otherForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const note = $('#otherText').value.trim();
+  if (note) answer(otherWord, 'Other', note);
+});
 
 function openPing() {
   $('#askMsg').textContent = '';
@@ -434,12 +469,12 @@ function openPing() {
 }
 const closePing = () => { $('#ping').hidden = true; loadMe(); };
 
-async function answer(word, reason) {
-  const buttons = [...$('#askBlock').querySelectorAll('button')];
+async function answer(word, reason, note) {
+  const buttons = [...$('#askBlock').querySelectorAll('button, input')];
   buttons.forEach((b) => { b.disabled = true; });
   let streak;
   try {
-    streak = await checkIn(word, reason);
+    streak = await checkIn(word, reason, note);
   } catch (err) {
     $('#askMsg').textContent = err.message;
     buttons.forEach((b) => { b.disabled = false; });
@@ -447,7 +482,7 @@ async function answer(word, reason) {
   }
   $('#askBlock').hidden = true;
   $('#thanks').textContent = `Thanks! 🔥 ${streak}-day streak`;
-  $('#picked').textContent = `You picked ${word} · ${reason}`;
+  $('#picked').textContent = `You picked ${word} · ${note ? `“${note}”` : reason}`;
   $('#doneBlock').hidden = false;
   $('#doneBtn').focus();
   loadWall();
@@ -541,6 +576,10 @@ function openDay(week, day) {
   $('#day').hidden = false; // shown first, so the charts can measure their width
   $('#dayFeelings').replaceChildren(...barChart(day.feelings, (w) => `var(--mood-${levelOf(w)})`));
   $('#dayReasons').replaceChildren(...barChart(day.reasons, () => 'var(--reason)'));
+  $('#dayNotes').replaceChildren(...(day.notes.length ? [
+    el('p', { className: 'notes-head', textContent: 'In their own words' }),
+    el('ul', { className: 'notes' }, ...shuffle(day.notes).map((n) => el('li', { textContent: `“${n}”` }))),
+  ] : []));
   weekChart(week, day);
   $('#dayClose').focus();
 }

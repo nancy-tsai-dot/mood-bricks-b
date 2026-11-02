@@ -10,9 +10,11 @@ Version B of an A/B test of Mood Bricks (Version B is called Mood Journey), an a
 Instead of five emoji, you check in with two word clouds:
 
 1. **How do you feel about your work right now?** Pick one of 16 feeling words (Happy, Focused, Stressed, Anxious…).
-2. **What's making you feel that way?** Pick one reason. Low and so-so words get work reasons (Too many meetings, Poor tooling, Noise in the office…); good words get good reasons (Great teamwork, Finished something…).
+2. **What's making you feel that way?** Pick one reason. Low and so-so words get work reasons (Too many meetings, Poor tooling, Noise in the office…); good words get good reasons (Great teamwork, Finished something…). **Other** opens a text box for your own reason (up to 80 characters).
 
-Each word counts as a level from 1 (very low) to 5 (great), so the wall can be coloured just like in A. Each brick also shows the day's most picked word. Click a brick to see that day's feelings, reasons and week.
+Every word sits in a box of the same size and style, in a shuffled order, so no word is more suggestive than another.
+
+Each word counts as a level from 1 (very low) to 5 (great), so the wall can be coloured just like in A. Each brick also shows the day's most picked word. Click a brick to see that day's feelings, reasons, typed "Other" reasons and week.
 
 There are no surprises: no gift box, no memes, no "Add a surprise" page. After checking in you just see your streak and what you picked.
 
@@ -26,10 +28,10 @@ The random daily ping, the private streak, the 80% team goal and minifig badge, 
 
 A plain static website (`index.html`, `style.css`, `app.js`) on GitHub Pages, using the same Firebase Firestore database as Version A.
 
-- B saves answers in `b_answers` (date, hour, word, reason) and check-ins in `b_checkins`, so A's and B's numbers stay apart.
+- B saves answers in `b_answers` (date, hour, word, reason, and a note for "Other") and check-ins in `b_checkins`, so A's and B's numbers stay apart.
 - Work events (`events`) are shared with Version A.
 - Your streak is kept in your browser under its own `mbb-` names, so it doesn't mix with A's.
-- `firestore.rules` is the full rule set for both versions (A still uses the `memes` rule). Only words and reasons from the fixed lists are accepted. No edits, no deletes.
+- `firestore.rules` is the full rule set for both versions (A still uses the `memes` rule). Only words and reasons from the fixed lists are accepted, plus a note of up to 80 characters with "Other". No edits, no deletes.
 
 ## Run it locally
 

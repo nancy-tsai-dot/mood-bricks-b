@@ -154,11 +154,16 @@ button.brick:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .word {
   font: inherit; font-weight: 600; color: var(--navy); background: var(--surface); cursor: pointer;
   font-size: 18px; border: 2px solid #c6d3e1; border-radius: 999px; padding: 8px 16px; line-height: 1.2;
+  width: var(--word-width, auto); max-width: 100%; /* all as wide as the longest word, set in app.js */
   transition: transform .12s, background .12s, border-color .12s;
 }
 /* Every word looks the same, so none is more suggestive than another. */
-.word:hover:not(:disabled), .word:focus-visible { background: #fff6c2; border-color: var(--bright-yellow); transform: translateY(-2px) scale(1.04); }
+.word:hover:not(:disabled), .word:focus-visible, .word[aria-pressed="true"] { background: #fff6c2; border-color: var(--bright-yellow); transform: translateY(-2px) scale(1.04); }
 .word:disabled { opacity: .5; cursor: default; }
+.other { max-width: 520px; margin: 20px auto 0; text-align: left; }
+.other input { margin-top: 0; }
+.other .small { margin: 6px 0 0; }
+.btn:disabled { opacity: .5; cursor: default; filter: none; }
 .link { margin-top: 18px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--bright-blue); cursor: pointer; padding: 6px; }
 .thanks { font-weight: 800; font-size: 20px; }
 
@@ -190,6 +195,8 @@ button.brick:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .week-chart .val { font-size: 13px; font-weight: 700; fill: var(--content); }
 .week-table { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
 .week-table b { color: var(--content); }
+.notes-head { font-size: 14px; font-weight: 600; margin: 14px 0 6px; }
+.notes { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.5; }
 .nowrap { white-space: nowrap; }
 
 @media (prefers-reduced-motion: reduce) {
