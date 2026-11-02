@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Mood Journey · Version B</title>
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <header class="top">
@@ -12,14 +12,15 @@
       <div class="brand">🧭 Mood Journey <span class="version">Version B</span></div>
       <nav class="jump" aria-label="Sections">
         <a href="#me">Check in</a>
-        <a href="#wall">Team wall</a>
+        <a href="#insight">Insight</a>
+        <a href="#wall">My wall</a>
       </nav>
     </div>
   </header>
 
   <section class="hero" id="me">
     <div class="hero-inner">
-      <p class="private">Only you can see this. It's saved in this browser.</p>
+      <p class="private">Your private journal. Only you can see it. It's saved in this browser.</p>
       <p class="streak" id="streak">…</p>
       <p class="hero-sub" id="streakSub"></p>
       <button class="btn yellow" id="pingNow">Check in now</button>
@@ -29,29 +30,28 @@
   </section>
 
   <main>
+    <section class="section insight-section" id="insight">
+      <div class="card insight">
+        <h2>Insight</h2>
+        <p class="insight-text" id="insightText"></p>
+        <p class="muted" id="insightEvidence"></p>
+        <p class="sample-note small" id="sampleNote" hidden>Includes sample data. Untick “Include sample data” below to see only yours.</p>
+        <h3>More patterns</h3>
+        <ul id="patterns" class="patterns"></ul>
+      </div>
+    </section>
+
     <section class="section" id="wall">
-      <h2>Team brick wall</h2>
-      <p class="muted">Each brick is one workday. Its colour is the team's average feeling and its word is the one picked most. Days with fewer than <span id="minAnswers">3</span> answers stay grey, so nobody can be singled out. Click a coloured brick to see that day up close.</p>
+      <h2>My wall</h2>
+      <p class="muted">Each brick is one workday. Its colour is how you felt on average and its word is the one you picked most. Click a coloured brick to see that day up close.</p>
       <label class="check"><input type="checkbox" id="showSample" checked> Include sample data</label>
       <div class="card">
-        <div id="wallGrid" class="wall" aria-label="Team feelings by day"></div>
+        <div id="wallGrid" class="wall" aria-label="Your feelings by day"></div>
         <div class="legend" id="legend"></div>
       </div>
-      <div class="two">
-        <div class="card">
-          <h3>Patterns noticed</h3>
-          <ul id="patterns" class="patterns"></ul>
-        </div>
-        <div class="card">
-          <h3>Team goal this month</h3>
-          <p id="goalText"></p>
-          <div class="bar"><div id="goalBar"></div><span class="target" id="goalTarget"></span></div>
-          <p class="muted small" id="goalSub"></p>
-        </div>
-      </div>
       <div class="card">
-        <h3>Add a work event</h3>
-        <p class="muted">Releases, deadlines, sprint starts. They show on the wall so you can see how work affects how people feel.</p>
+        <h3>Add an event</h3>
+        <p class="muted">Releases, deadlines, holidays. They show on your wall, so you can see what affects how you feel.</p>
         <form id="eventForm" class="row">
           <input type="date" name="date" required aria-label="Date">
           <input name="label" placeholder="e.g. Release" maxlength="30" required aria-label="Event name">
@@ -61,7 +61,7 @@
       </div>
     </section>
 
-    <p class="muted small footer">Anonymous: no names, no logins. Anyone with this link can add answers. A workshop prototype from Imaginarium.</p>
+    <p class="muted small footer">Private: no names, no logins, and nothing leaves this browser. Clearing your browser data erases your journal. A workshop prototype from Imaginarium.</p>
   </main>
 
   <div class="overlay" id="day" hidden>
@@ -94,7 +94,6 @@
             <input id="otherText" autocomplete="off" placeholder="What’s going on?">
             <button class="btn primary" id="otherSend" disabled>Send</button>
           </div>
-          <p class="muted small">Everyone on the team can read this, so leave out names.</p>
         </form>
         <button type="button" class="link" id="backBtn" hidden>← Pick a different word</button>
         <p class="msg" id="askMsg" role="status"></p>
@@ -107,6 +106,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

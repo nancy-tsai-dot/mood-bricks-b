@@ -1,21 +1,11 @@
 'use strict';
-// Mood Journey (Version B of Mood Bricks): check in with a feeling word and a reason instead of an emoji.
-// Everything runs in the browser; the shared team data lives in Firebase Firestore, in the same
-// project as Version A. B keeps its own answers and check-ins, shares A's work events, and has no surprises.
-// The key below is public by design: firestore.rules decides what anyone can do.
+// Mood Journey (Version B of Mood Bricks): a private mood journal. Check in with a feeling word and a reason.
+// Everything is saved only in this browser (localStorage). Nothing is sent anywhere, and there is no team view.
 
-const PROJECT = 'mood-bricks';
-const API_KEY = 'AIzaSyD9kl4er8K00JVM4G8REZYMxMOpeQ_9Pvk';
-const DB = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
-const ANSWERS = 'b_answers';
-const CHECKINS = 'b_checkins';
 const STORE = 'mbb-'; // A and B share a web address, so B's browser storage gets its own prefix
-
-const MIN_ANSWERS_TO_SHOW = 3; // a day with fewer answers stays grey, so nobody can be singled out
-const MIN_TEAM_SIZE = 5;
-const TEAM_GOAL = 0.8; // 80% of possible check-ins this month
 const WEEKS_ON_WALL = 5;
 const WEEKS_ANALYSED = 12; // patterns look at the last 12 weeks
+const MIN_FOR_INSIGHT = 3; // check-ins in a week before the insight says anything
 
 // Each word counts as a level from 1 to 5, so the wall can be coloured and averaged.
 const FEELINGS = [
@@ -74,87 +64,18 @@ function weekNumber(d) {
 }
 const analysedFrom = () => dayStr(addDays(mondayOf(new Date()), -7 * (WEEKS_ANALYSED - 1)));
 
-// ---------- the team database ----------
-const toFields = (obj) => Object.fromEntries(Object.entries(obj).map(([k, v]) =>
-  [k, Number.isInteger(v) ? { integerValue: String(v) } : { stringValue: String(v) }]));
-const fromDoc = (doc) => {
-  const out = { id: doc.name.split('/').pop() };
-  for (const [k, v] of Object.entries(doc.fields || {})) out[k] = 'integerValue' in v ? Number(v.integerValue) : v.stringValue;
-  return out;
-};
-
-async function request(url, body) {
-  let res;
+// ---------- your journal (stored only in this browser) ----------
+const read = (name) => { try { return JSON.parse(localStorage.getItem(`${STORE}${name}`)) || []; } catch { return []; } };
+const write = (name, value) => {
   try {
-    res = await fetch(url, body
-      ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-      : undefined);
+    localStorage.setItem(`${STORE}${name}`, JSON.stringify(value));
   } catch {
-    throw new Error('Can’t reach the team database. Check your internet connection.');
+    throw new Error('Couldn’t save in this browser. Is it in private mode, or full?');
   }
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 403) throw new Error('The team database didn’t accept that.');
-  if (res.status === 429) throw new Error('The team database hit its free daily limit. Try again tomorrow.');
-  if (!res.ok) throw new Error('Something went wrong with the team database.');
-  return data;
-}
-
-const addDoc = (collection, data) => request(`${DB}/${collection}?key=${API_KEY}`, { fields: toFields(data) });
-
-// Lists a whole collection, fetching only the named fields.
-async function listDocs(collection, fields) {
-  const mask = fields.map((f) => `&mask.fieldPaths=${f}`).join('');
-  const out = [];
-  let pageToken = '';
-  do {
-    const data = await request(`${DB}/${collection}?key=${API_KEY}&pageSize=300${mask}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`);
-    out.push(...(data.documents || []).map(fromDoc));
-    pageToken = data.nextPageToken || '';
-  } while (pageToken);
-  return out;
-}
-
-// Everything in a collection dated on or after a day.
-async function since(collection, date) {
-  const rows = await request(`${DB}:runQuery?key=${API_KEY}`, {
-    structuredQuery: {
-      from: [{ collectionId: collection }],
-      where: { fieldFilter: { field: { fieldPath: 'date' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: date } } },
-    },
-  });
-  return rows.filter((r) => r.document).map((r) => fromDoc(r.document));
-}
-
-// Past days don't change, so after the first load only today's data is fetched again.
-// That keeps the shared screen well inside the database's free daily allowance.
-const cache = { answers: [], checkins: [], events: [], loadedOn: null };
-async function refreshTeamData() {
-  const today = dayStr(new Date());
-  const from = cache.loadedOn === today ? today : analysedFrom();
-  const [answers, checkins, events] = await Promise.all([
-    since(ANSWERS, from), since(CHECKINS, from), listDocs('events', ['date', 'label']),
-  ]);
-  const keepOlder = (rows) => rows.filter((r) => r.date < from);
-  const withLevel = answers.map((a) => ({ ...a, score: levelOf(a.word) })).filter((a) => a.score);
-  cache.answers = [...keepOlder(cache.answers), ...withLevel];
-  cache.checkins = [...keepOlder(cache.checkins), ...checkins];
-  cache.events = events;
-  cache.loadedOn = today;
-}
-
-// ---------- you (stored only in this browser) ----------
-// A random id kept in this browser, used only to count the team goal. No names anywhere.
-function deviceId() {
-  let id = localStorage.getItem(`${STORE}device`);
-  if (!id) {
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    id = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    localStorage.setItem(`${STORE}device`, id);
-  }
-  return id;
-}
-const DEVICE = deviceId();
-const myDays = () => JSON.parse(localStorage.getItem(`${STORE}days`) || '[]');
+};
+const myEntries = () => read('entries').map((a) => ({ ...a, score: levelOf(a.word) })).filter((a) => a.score);
+const myEvents = () => read('events');
+const myDays = () => read('days');
 
 function streakFor(days) {
   const set = new Set(days);
@@ -165,20 +86,16 @@ function streakFor(days) {
   return n;
 }
 
-async function checkIn(word, reason, note) {
+function checkIn(word, reason, note) {
   const now = new Date();
   const today = dayStr(now);
-  await addDoc(ANSWERS, { date: today, hour: now.getHours(), word, reason, ...(note ? { note } : {}) });
+  write('entries', [...read('entries'), { date: today, hour: now.getHours(), word, reason, ...(note ? { note } : {}) }]);
   const days = myDays();
-  if (!days.includes(today)) {
-    days.push(today);
-    localStorage.setItem(`${STORE}days`, JSON.stringify(days));
-    await addDoc(CHECKINS, { device: DEVICE, date: today }).catch(() => {}); // only feeds the team goal
-  }
-  return streakFor(days);
+  if (!days.includes(today)) write('days', [...days, today]);
+  return streakFor([...days, today]);
 }
 
-// ---------- sample data, so the wall has patterns from day one ----------
+// ---------- sample data, so the page shows what a few weeks look like ----------
 function seededRandom(seed) {
   return () => {
     seed = (seed + 0x6d2b79f5) | 0;
@@ -197,19 +114,22 @@ function makeSampleData() {
   events.push({ date: dayStr(addDays(firstMonday, 14)), label: 'Sprint start' });
 
   const answers = [];
-  for (let w = 0; w < WEEKS_ON_WALL - 1; w++) {
+  const today = startOfDay(new Date());
+  for (let w = 0; w < WEEKS_ON_WALL; w++) {
     for (let wd = 0; wd < 5; wd++) {
       const d = addDays(firstMonday, w * 7 + wd);
+      if (d >= today) continue; // up to yesterday, so today is yours
       const untilRelease = Math.min(99, ...releases.map((r) => daysBetween(d, r)).filter((n) => n >= 0));
       let base = 4.0;
       if (untilRelease === 0) base -= 2.3;
       else if (untilRelease <= 2) base -= 1.3;
       if (wd === 0) base -= 0.3;
       if (wd === 4) base += 0.5;
-      const count = w === 2 && wd === 2 ? 2 : 4 + Math.floor(rand() * 3); // one quiet day stays grey
+      const r = rand();
+      const count = r < 0.12 ? 0 : r < 0.3 ? 2 : 1; // like a real person: mostly once a day, sometimes skipped
       for (let i = 0; i < count; i++) {
         const hour = 9 + Math.floor(rand() * 8);
-        const mood = base - (hour >= 15 ? 0.5 : 0) + (rand() - 0.5) * 1.2;
+        const mood = base - (hour >= 15 ? 0.5 : 0) + (rand() - 0.5) * 1.0;
         const score = Math.max(1, Math.min(5, Math.round(mood)));
         const word = pick(FEELINGS.filter((f) => f.level === score)).word;
         let reason;
@@ -229,7 +149,7 @@ const SAMPLE_GOOD_NOTES = ['Sunny walk at lunch', 'Nice chat with a colleague', 
 const SAMPLE_LOW_NOTES = ['Laptop is slow again', 'Waiting for a decision from above', 'Back pain from my chair'];
 const SAMPLE = makeSampleData();
 
-// ---------- patterns and the team goal ----------
+// ---------- patterns ----------
 const mean = (xs) => xs.reduce((s, x) => s + x, 0) / xs.length;
 const one = (x) => x.toFixed(1);
 const pct = (n, total) => `${Math.round((n / total) * 100)}%`;
@@ -246,62 +166,62 @@ function nearEvents(events) {
 }
 
 function findPatterns(answers, events) {
-  if (answers.length < 15) return ['Not enough check-ins yet to spot patterns. Keep going!'];
+  if (answers.length < 8) return ['Check in for a couple of weeks and more patterns show up here.'];
   const out = [];
   const overall = mean(answers.map((a) => a.score));
 
   // What's behind the low days, and when it comes up.
   const lows = answers.filter((a) => a.score <= 3);
-  if (lows.length >= 10) {
+  if (lows.length >= 4) {
     const [reason, n] = counts(lows.map((a) => a.reason))[0];
-    out.push(`The top reason behind low feelings is “${reason}” (${pct(n, lows.length)} of low check-ins).`);
+    out.push(`Your top reason on low days is “${reason}” (${pct(n, lows.length)} of low check-ins).`);
     const share = n / answers.length;
     const byWeekday = {};
     for (const a of answers) (byWeekday[parseDay(a.date).getDay()] ||= []).push(a);
     const peak = Object.entries(byWeekday)
-      .filter(([, v]) => v.length >= 5)
+      .filter(([, v]) => v.length >= 3)
       .map(([wd, v]) => ({ wd: Number(wd), hits: v.filter((a) => a.reason === reason).length, total: v.length }))
       .sort((a, b) => b.hits / b.total - a.hits / a.total)[0];
-    if (peak && peak.hits >= 3 && peak.hits / peak.total >= share * 1.5) {
+    if (peak && peak.hits >= 2 && peak.hits / peak.total >= share * 1.5) {
       out.push(`“${reason}” comes up most on ${WEEKDAYS[peak.wd]}s (${pct(peak.hits, peak.total)} of ${WEEKDAYS[peak.wd]} check-ins).`);
     }
   }
 
   const [topWord, topN] = counts(answers.map((a) => a.word))[0];
-  out.push(`The most picked feeling is ${topWord} (${pct(topN, answers.length)} of check-ins).`);
+  out.push(`You feel ${topWord} most often (${pct(topN, answers.length)} of check-ins).`);
 
   const byWeekday = {};
   for (const a of answers) (byWeekday[parseDay(a.date).getDay()] ||= []).push(a.score);
   const weekdays = Object.entries(byWeekday)
-    .filter(([, v]) => v.length >= 5)
+    .filter(([, v]) => v.length >= 3)
     .map(([wd, v]) => ({ wd: Number(wd), avg: mean(v) }));
   if (weekdays.length >= 3) {
     const low = weekdays.reduce((a, b) => (b.avg < a.avg ? b : a));
     const high = weekdays.reduce((a, b) => (b.avg > a.avg ? b : a));
-    if (overall - low.avg >= 0.3) out.push(`${WEEKDAYS[low.wd]}s are the toughest day (team level ${one(low.avg)} vs ${one(overall)} overall).`);
-    if (high.avg - overall >= 0.3) out.push(`${WEEKDAYS[high.wd]}s feel best (team level ${one(high.avg)}).`);
+    if (overall - low.avg >= 0.3) out.push(`${WEEKDAYS[low.wd]}s are your toughest day (level ${one(low.avg)} vs ${one(overall)} overall).`);
+    if (high.avg - overall >= 0.3) out.push(`${WEEKDAYS[high.wd]}s feel best (level ${one(high.avg)}).`);
   }
 
   if (events.length) {
     const near = nearEvents(events);
     const nearOnes = answers.filter((a) => near.has(a.date));
     const others = answers.filter((a) => !near.has(a.date));
-    if (nearOnes.length >= 5 && others.length >= 5) {
+    if (nearOnes.length >= 3 && others.length >= 3) {
       const diff = mean(others.map((a) => a.score)) - mean(nearOnes.map((a) => a.score));
       const [nearWord] = counts(nearOnes.map((a) => a.word))[0];
       const [otherWord] = counts(others.map((a) => a.word))[0];
-      const words = nearWord !== otherWord ? ` The most picked word is ${nearWord}, against ${otherWord} the rest of the time.` : '';
-      if (diff >= 0.3) out.push(`Feelings drop in the 2 days before work events and on the day (team level ${one(mean(nearOnes.map((a) => a.score)))} vs ${one(mean(others.map((a) => a.score)))}).${words}`);
-      if (diff <= -0.3) out.push(`Feelings are better around work events (team level ${one(mean(nearOnes.map((a) => a.score)))} vs ${one(mean(others.map((a) => a.score)))}).${words}`);
+      const words = nearWord !== otherWord ? ` You pick ${nearWord} most then, against ${otherWord} the rest of the time.` : '';
+      if (diff >= 0.3) out.push(`You feel worse in the 2 days before your events and on the day (level ${one(mean(nearOnes.map((a) => a.score)))} vs ${one(mean(others.map((a) => a.score)))}).${words}`);
+      if (diff <= -0.3) out.push(`You feel better around your events (level ${one(mean(nearOnes.map((a) => a.score)))} vs ${one(mean(others.map((a) => a.score)))}).${words}`);
     }
   }
 
   const morning = answers.filter((a) => a.hour < 12).map((a) => a.score);
   const afternoon = answers.filter((a) => a.hour >= 12).map((a) => a.score);
-  if (morning.length >= 5 && afternoon.length >= 5) {
+  if (morning.length >= 3 && afternoon.length >= 3) {
     const diff = mean(morning) - mean(afternoon);
-    if (diff >= 0.3) out.push(`Mornings feel better than afternoons (team level ${one(mean(morning))} vs ${one(mean(afternoon))}).`);
-    if (diff <= -0.3) out.push(`Afternoons feel better than mornings (team level ${one(mean(afternoon))} vs ${one(mean(morning))}).`);
+    if (diff >= 0.3) out.push(`Your mornings feel better than your afternoons (level ${one(mean(morning))} vs ${one(mean(afternoon))}).`);
+    if (diff <= -0.3) out.push(`Your afternoons feel better than your mornings (level ${one(mean(afternoon))} vs ${one(mean(morning))}).`);
   }
 
   const days = [...new Set(answers.map((a) => a.date))].sort();
@@ -310,30 +230,73 @@ function findPatterns(answers, events) {
   if (before.size >= 5) {
     const r = mean(answers.filter((a) => recent.has(a.date)).map((a) => a.score));
     const b = mean(answers.filter((a) => before.has(a.date)).map((a) => a.score));
-    if (r - b >= 0.3) out.push(`Trending up: the last 2 weeks are at team level ${one(r)}, up from ${one(b)}.`);
-    if (b - r >= 0.3) out.push(`Trending down: the last 2 weeks are at team level ${one(r)}, down from ${one(b)}.`);
+    if (r - b >= 0.3) out.push(`Trending up: your last 2 weeks are at level ${one(r)}, up from ${one(b)}.`);
+    if (b - r >= 0.3) out.push(`Trending down: your last 2 weeks are at level ${one(r)}, down from ${one(b)}.`);
   }
 
   return out;
 }
 
-function goal() {
-  const today = startOfDay(new Date());
-  let workdays = 0;
-  for (let d = new Date(today.getFullYear(), today.getMonth(), 1); d <= today; d = addDays(d, 1)) if (!isWeekend(d)) workdays++;
-  const month = dayStr(today).slice(0, 7);
-  const teamSize = Math.max(MIN_TEAM_SIZE, new Set(cache.checkins.map((c) => c.device)).size);
-  const checkins = new Set(cache.checkins
-    .filter((c) => c.date.startsWith(month) && !isWeekend(parseDay(c.date)))
-    .map((c) => `${c.device} ${c.date}`)).size;
-  const rate = workdays ? Math.min(1, checkins / (teamSize * workdays)) : 0;
-  return { rate, target: TEAM_GOAL, teamSize, reached: rate >= TEAM_GOAL };
+// ---------- the insight: your week in one sentence, built from your reasons ----------
+const LIFTS = { 'Finished something': 'Finishing things', 'Personal reasons': 'Life outside work', Other: 'Something outside the list' };
+const DRAGS = { 'Personal reasons': 'Life outside work', Other: 'Something outside the list' };
+const lowerFirst = (s) => s[0].toLowerCase() + s.slice(1);
+// "Other" is named by what you typed, so the sentence reflects your own reason.
+const nameOf = (r, names) => (r.reason === 'Other' && r.notes.length ? `“${r.notes[r.notes.length - 1]}”` : names[r.reason] || r.reason);
+
+// The reason that came up most in a group of check-ins; a tie goes to the one with the strongest feelings.
+function topReason(list, stronger) {
+  const byReason = {};
+  for (const a of list) (byReason[a.reason] ||= []).push(a);
+  return Object.entries(byReason)
+    .map(([reason, xs]) => ({ reason, n: xs.length, avg: mean(xs.map((a) => a.score)), notes: xs.filter((a) => a.note).map((a) => a.note) }))
+    .sort((a, b) => b.n - a.n || stronger(a.avg, b.avg))[0];
+}
+
+function insight(answers) {
+  const thisMonday = mondayOf(new Date());
+  const inWeek = (monday) => answers.filter((a) => a.date >= dayStr(monday) && a.date < dayStr(addDays(monday, 7)));
+  let when = 'This week';
+  let list = inWeek(thisMonday);
+  if (list.length < MIN_FOR_INSIGHT) { // early in the week, last week says more
+    const last = inWeek(addDays(thisMonday, -7));
+    if (last.length >= MIN_FOR_INSIGHT) { when = 'Last week'; list = last; }
+  }
+  if (list.length < MIN_FOR_INSIGHT) {
+    return {
+      sentence: 'Your first insight is on its way.',
+      evidence: `Check in ${MIN_FOR_INSIGHT} times in a week to get it. This week so far: ${list.length}.`,
+    };
+  }
+
+  const lows = list.filter((a) => a.score <= 3);
+  const goods = list.filter((a) => a.score >= 4);
+  const drag = lows.length ? topReason(lows, (a, b) => a - b) : null; // the lowest feelings win a tie
+  const lift = goods.length ? topReason(goods, (a, b) => b - a) : null;
+  const week = lowerFirst(when);
+  let sentence;
+  let shown;
+  if (lows.length >= 2 && goods.length >= 2) {
+    sentence = `${nameOf(lift, LIFTS)} lifted ${week}, but ${lowerFirst(nameOf(drag, DRAGS))} dragged it down.`;
+    shown = [lift, drag];
+  } else if (lows.length >= goods.length) {
+    sentence = `${nameOf(drag, DRAGS)} dragged ${week} down.`;
+    shown = [drag];
+  } else {
+    sentence = `${nameOf(lift, LIFTS)} lifted ${week}.`;
+    shown = [lift];
+  }
+  const [topWord, topN] = counts(list.map((a) => a.word))[0];
+  const notes = shown.flatMap((r) => r.notes).slice(0, 2);
+  const evidence = `${when}: ${shown.map((r) => `“${r.reason}” in ${r.n}`).join(' and ')} of your ${list.length} check-ins.`
+    + `${topN > 1 ? ` Mostly ${topWord}.` : ''}${notes.length ? ` You wrote: ${notes.map((n) => `“${n}”`).join(', ')}.` : ''}`;
+  return { sentence, evidence };
 }
 
 function wall(includeSample) {
   const from = analysedFrom();
-  const answers = [...cache.answers, ...(includeSample ? SAMPLE.answers : [])].filter((a) => a.date >= from);
-  const events = [...cache.events, ...(includeSample ? SAMPLE.events : [])];
+  const answers = [...myEntries(), ...(includeSample ? SAMPLE.answers : [])].filter((a) => a.date >= from);
+  const events = [...myEvents(), ...(includeSample ? SAMPLE.events : [])];
   const byDay = {};
   for (const a of answers) (byDay[a.date] ||= []).push(a);
   const today = dayStr(new Date());
@@ -346,7 +309,7 @@ function wall(includeSample) {
     for (let i = 0; i < 5; i++) {
       const date = dayStr(addDays(monday, i));
       const list = byDay[date] || [];
-      const shown = list.length >= MIN_ANSWERS_TO_SHOW;
+      const shown = list.length > 0;
       const avg = shown ? Math.round(mean(list.map((a) => a.score)) * 10) / 10 : null;
       // Most picked first; a tie goes to the word closest to the day's average.
       const feelings = shown ? counts(list.map((a) => a.word))
@@ -357,7 +320,7 @@ function wall(includeSample) {
         avg,
         feelings,
         reasons: shown ? counts(list.map((a) => a.reason)) : null,
-        notes: shown ? list.filter((a) => a.note).map((a) => a.note) : null, // typed reasons, hidden on small days like everything else
+        notes: shown ? list.filter((a) => a.note).map((a) => a.note) : null,
         future: date > today,
         events: events.filter((e) => e.date === date).map((e) => e.label),
       });
@@ -365,7 +328,7 @@ function wall(includeSample) {
     weeks.push({ label: `Week ${weekNumber(monday)}`, sub: `${monday.getDate()} ${MONTHS[monday.getMonth()]}`, days });
   }
   const recentEvents = events.filter((e) => e.date >= from);
-  return { weeks, patterns: findPatterns(answers, recentEvents), goal: goal() };
+  return { weeks, patterns: findPatterns(answers, recentEvents), insight: insight(answers) };
 }
 
 // ---------- your streak ----------
@@ -469,15 +432,12 @@ function openPing() {
 }
 const closePing = () => { $('#ping').hidden = true; loadMe(); };
 
-async function answer(word, reason, note) {
-  const buttons = [...$('#askBlock').querySelectorAll('button, input')];
-  buttons.forEach((b) => { b.disabled = true; });
+function answer(word, reason, note) {
   let streak;
   try {
-    streak = await checkIn(word, reason, note);
+    streak = checkIn(word, reason, note);
   } catch (err) {
     $('#askMsg').textContent = err.message;
-    buttons.forEach((b) => { b.disabled = false; });
     return;
   }
   $('#askBlock').hidden = true;
@@ -485,7 +445,7 @@ async function answer(word, reason, note) {
   $('#picked').textContent = `You picked ${word} · ${note ? `“${note}”` : reason}`;
   $('#doneBlock').hidden = false;
   $('#doneBtn').focus();
-  loadWall();
+  render();
 }
 
 $('#pingNow').addEventListener('click', openPing);
@@ -498,20 +458,17 @@ document.addEventListener('keydown', (e) => {
   else if (!$('#day').hidden) closeDay();
 });
 
-// ---------- team wall ----------
+// ---------- insight and your wall ----------
 const levelFor = (avg) => LEVELS[Math.min(4, Math.max(0, Math.round(avg) - 1))];
 const prettyDate = (s) => new Date(`${s}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
 
-async function loadWall() {
-  let problem = '';
-  try {
-    await refreshTeamData();
-  } catch (err) {
-    problem = err.message; // still draw the wall from what's already loaded (and the sample data)
-  }
-  const data = wall($('#showSample').checked);
-  if (problem) data.patterns.unshift(`Couldn’t load the latest answers: ${problem}`);
-  $('#minAnswers').textContent = MIN_ANSWERS_TO_SHOW;
+function render() {
+  const includeSample = $('#showSample').checked;
+  const data = wall(includeSample);
+  $('#insightText').textContent = data.insight.sentence;
+  $('#insightEvidence').textContent = data.insight.evidence;
+  $('#sampleNote').hidden = !includeSample;
+  $('#patterns').replaceChildren(...data.patterns.map((p) => el('li', { textContent: p })));
 
   const cells = [el('div'), ...HEADS.map((d) => el('div', { className: 'head', textContent: d }))];
   for (const week of data.weeks) {
@@ -521,11 +478,11 @@ async function loadWall() {
       if (day.future) {
         brick = el('div', { className: 'brick future', title: prettyDate(day.date) });
       } else if (day.avg == null) {
-        brick = el('div', { className: 'brick grey', title: day.count ? `${prettyDate(day.date)}: too few answers to show` : `${prettyDate(day.date)}: no answers` });
+        brick = el('div', { className: 'brick grey', title: `${prettyDate(day.date)}: no check-in` });
       } else {
         const level = levelFor(day.avg);
         const [word] = day.feelings[0];
-        const summary = `${prettyDate(day.date)}: mostly ${word}, team level ${day.avg} (${level.label}) from ${day.count} answers`;
+        const summary = `${prettyDate(day.date)}: ${day.count > 1 ? `mostly ${word}` : word}, level ${day.avg} (${level.label}) from ${day.count} ${day.count === 1 ? 'check-in' : 'check-ins'}`;
         brick = el('button', {
           type: 'button', className: `brick m${level.level}`,
           title: `${summary}. Click for details.`, ariaLabel: `${summary}. Open details`,
@@ -540,18 +497,8 @@ async function loadWall() {
   $('#legend').replaceChildren(
     ...[...LEVELS].reverse().map((l) => el('span', {}, el('i', { className: `m${l.level}` }),
       el('b', { textContent: l.label }), ` ${FEELINGS.filter((f) => f.level === l.level).map((f) => f.word).join(', ')}`)),
-    el('span', {}, el('i', { className: 'grey' }), 'Too few answers'),
+    el('span', {}, el('i', { className: 'grey' }), 'No check-in'),
   );
-
-  $('#patterns').replaceChildren(...data.patterns.map((p) => el('li', { textContent: p })));
-
-  const { rate, target, teamSize, reached } = data.goal;
-  $('#goalText').textContent = `${Math.round(rate * 100)}% of possible check-ins so far · goal ${Math.round(target * 100)}%`;
-  $('#goalBar').style.width = `${Math.round(rate * 100)}%`;
-  $('#goalTarget').style.left = `${Math.round(target * 100)}%`;
-  $('#goalSub').textContent = reached
-    ? 'Goal reached! Everyone unlocks a minifig badge 🏅'
-    : `Reach ${Math.round(target * 100)}% and everyone unlocks a minifig badge 🏅 (counted for a team of ${teamSize})`;
 }
 
 // ---------- one day, up close ----------
@@ -571,14 +518,14 @@ function openDay(week, day) {
   $('#dayEvents').replaceChildren(...day.events.map((e) => el('span', { className: 'tag', textContent: e })));
   $('#dayTop').replaceChildren(
     el('span', { className: 'big', textContent: word }),
-    el('span', { className: 'muted', textContent: `picked by ${n} of ${day.count} · team level ${day.avg.toFixed(1)} of 5 (${level.label})` }),
+    el('span', { className: 'muted', textContent: `${day.count > 1 ? `${n} of ${day.count} check-ins · ` : ''}your level ${day.avg.toFixed(1)} of 5 (${level.label})` }),
   );
   $('#day').hidden = false; // shown first, so the charts can measure their width
   $('#dayFeelings').replaceChildren(...barChart(day.feelings, (w) => `var(--mood-${levelOf(w)})`));
   $('#dayReasons').replaceChildren(...barChart(day.reasons, () => 'var(--reason)'));
   $('#dayNotes').replaceChildren(...(day.notes.length ? [
-    el('p', { className: 'notes-head', textContent: 'In their own words' }),
-    el('ul', { className: 'notes' }, ...shuffle(day.notes).map((n) => el('li', { textContent: `“${n}”` }))),
+    el('p', { className: 'notes-head', textContent: 'In your own words' }),
+    el('ul', { className: 'notes' }, ...day.notes.map((n) => el('li', { textContent: `“${n}”` }))),
   ] : []));
   weekChart(week, day);
   $('#dayClose').focus();
@@ -590,14 +537,14 @@ $('#day').addEventListener('click', (e) => { if (e.target.id === 'day') closeDay
 // One bar per word that was picked, most picked at the top, count at the tip.
 function barChart(rows, colourOf) {
   const most = rows[0][1];
-  return rows.map(([name, n]) => el('div', { className: 'mix-row', title: `${name}: ${n} ${n === 1 ? 'answer' : 'answers'}` },
+  return rows.map(([name, n]) => el('div', { className: 'mix-row', title: `${name}: ${n} ${n === 1 ? 'check-in' : 'check-ins'}` },
     el('span', { className: 'mix-label', textContent: name }),
     el('span', { className: 'mix-track' },
       el('span', { className: 'mix-bar', style: `width:calc((100% - 32px) * ${n / most});background:${colourOf(name)}` }),
       el('span', { className: 'mix-val', textContent: String(n) }))));
 }
 
-// The team level for each workday of that week. Days with too few answers are left as gaps.
+// Your level for each workday of that week. Days without a check-in are left as gaps.
 function weekChart(week, selected) {
   const box = $('#dayWeek');
   const W = Math.max(260, box.clientWidth);
@@ -605,7 +552,7 @@ function weekChart(week, selected) {
   const pad = { l: 28, r: 16, t: 22, b: 28 };
   const x = (i) => pad.l + (i * (W - pad.l - pad.r)) / 4;
   const y = (v) => pad.t + ((5 - v) * (H - pad.t - pad.b)) / 4;
-  const chart = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Team level per day in ${week.label}` });
+  const chart = svg('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Your level per day in ${week.label}` });
 
   for (const l of LEVELS) { // hairline grid, levels 1 to 5
     chart.append(
@@ -627,8 +574,8 @@ function weekChart(week, selected) {
     chart.append(svg('text', { x: x(i), y: H - 8, 'text-anchor': 'middle', class: isSelected ? 'day sel' : 'day' }, HEADS[i]));
     if (d.avg == null) return;
     const level = levelFor(d.avg);
-    const point = svg('g', { class: 'pt', tabindex: 0, role: 'button', 'aria-label': `${prettyDate(d.date)}: team level ${d.avg}` },
-      svg('title', {}, `${prettyDate(d.date)}: mostly ${d.feelings[0][0]}, team level ${d.avg} (${level.label}) from ${d.count} answers`),
+    const point = svg('g', { class: 'pt', tabindex: 0, role: 'button', 'aria-label': `${prettyDate(d.date)}: level ${d.avg}` },
+      svg('title', {}, `${prettyDate(d.date)}: ${d.feelings[0][0]}, level ${d.avg} (${level.label}) from ${d.count} ${d.count === 1 ? 'check-in' : 'check-ins'}`),
       svg('circle', { cx: x(i), cy: y(d.avg), r: 14, class: 'hit' }),
       svg('circle', { cx: x(i), cy: y(d.avg), r: isSelected ? 7 : 5, fill: moodColour(level.level), class: 'dot' }));
     if (isSelected) point.append(svg('text', { x: x(i), y: y(d.avg) - 12, 'text-anchor': 'middle', class: 'val' }, d.avg.toFixed(1)));
@@ -639,29 +586,24 @@ function weekChart(week, selected) {
   });
 
   // The same numbers as text, so nobody has to hover to read them.
-  const table = el('p', { className: 'week-table' }, 'Team level, 1 very low to 5 great: ', ...week.days.flatMap((d, i) => [
+  const table = el('p', { className: 'week-table' }, 'Your level, 1 very low to 5 great: ', ...week.days.flatMap((d, i) => [
     i ? ' · ' : '', el(d.date === selected.date ? 'b' : 'span', { className: 'nowrap', textContent: `${HEADS[i]} ${d.avg == null ? '–' : `${d.avg.toFixed(1)} ${d.feelings[0][0]}`}` }),
   ]));
   box.replaceChildren(chart, table);
 }
 
-$('#showSample').addEventListener('change', loadWall);
+$('#showSample').addEventListener('change', render);
 
-// Live refresh for a shared screen, but only while the wall is on screen, to save database reads.
-let wallInView = false;
-new IntersectionObserver(([entry]) => { wallInView = entry.isIntersecting; }).observe($('#wall'));
-setInterval(() => { if (wallInView && document.visibilityState === 'visible') loadWall(); }, 30000);
-
-$('#eventForm').addEventListener('submit', async (e) => {
+$('#eventForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const form = e.target;
   try {
     const label = form.label.value.trim();
     if (!form.date.value || !label) throw new Error('Add a date and a name for the event.');
-    await addDoc('events', { date: form.date.value, label });
+    write('events', [...myEvents(), { date: form.date.value, label }]);
     form.reset();
-    $('#eventMsg').textContent = 'Added to the wall (it shows in Version A too).';
-    loadWall();
+    $('#eventMsg').textContent = 'Added to your wall.';
+    render();
   } catch (err) {
     $('#eventMsg').textContent = err.message;
   }
@@ -669,6 +611,6 @@ $('#eventForm').addEventListener('submit', async (e) => {
 
 // ---------- start ----------
 loadMe();
-loadWall();
+render();
 checkPing();
 setInterval(checkPing, 30000);

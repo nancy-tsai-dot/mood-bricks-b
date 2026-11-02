@@ -68,9 +68,12 @@ p { margin: 0 0 12px; line-height: 1.45; }
 main { max-width: 880px; margin: 0 auto; padding: 0 16px; }
 .section { padding-top: 40px; scroll-margin-top: 64px; }
 .card { background: var(--surface); border-radius: var(--radius); padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(8, 40, 74, .06), 0 4px 16px rgba(8, 40, 74, .06); }
-.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-.two .card { margin-bottom: 0; }
-.two + .card { margin-top: 16px; }
+.insight-section { padding-top: 0; margin-top: -32px; position: relative; } /* the card overlaps the navy hero */
+.insight { padding: 28px; }
+.insight h2 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--bright-blue); margin-bottom: 8px; }
+.insight-text { font-size: 28px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; margin-bottom: 8px; }
+.insight h3 { font-size: 16px; margin: 22px 0 8px; padding-top: 18px; border-top: 1px solid var(--stroke); }
+.sample-note { color: var(--muted); background: #fff6c2; border-radius: 8px; padding: 6px 10px; display: inline-block; }
 
 /* ---------- buttons and forms ---------- */
 .btn {
@@ -129,9 +132,6 @@ button.brick:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .patterns { margin: 0; padding-left: 20px; line-height: 1.5; }
 .patterns li { margin-bottom: 8px; }
 
-.bar { position: relative; height: 14px; background: #e3e9f0; border-radius: 7px; margin-bottom: 8px; }
-.bar > div { height: 100%; width: 0; background: var(--bright-green); border-radius: 7px; transition: width .6s; }
-.bar .target { position: absolute; top: -4px; bottom: -4px; width: 3px; background: var(--content); border-radius: 2px; }
 
 /* ---------- the check-in ping ---------- */
 .overlay {
@@ -205,6 +205,8 @@ button.brick:hover { filter: brightness(1.08); transform: translateY(-1px); }
 }
 @media (max-width: 520px) {
   h2 { font-size: 25px; }
+  .insight { padding: 20px; }
+  .insight-text { font-size: 22px; }
   .streak { font-size: 36px; }
   .hero { padding: 28px 16px 40px; }
   .card { padding: 18px; }
