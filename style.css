@@ -84,7 +84,6 @@ main { max-width: 880px; margin: 0 auto; padding: 0 16px; }
 }
 .more[open] summary::after { transform: rotate(-135deg); margin-bottom: -4px; }
 .more .patterns { margin-top: 10px; }
-.sample-note { color: var(--muted); background: #fff6c2; border-radius: 8px; padding: 6px 10px; display: inline-block; }
 
 /* ---------- buttons and forms ---------- */
 .btn {

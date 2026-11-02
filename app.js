@@ -455,7 +455,6 @@ function render() {
   const data = wall(includeSample);
   $('#insightText').textContent = data.insight.sentence;
   $('#insightEvidence').textContent = data.insight.evidence;
-  $('#sampleNote').hidden = !includeSample;
   $('#patterns').replaceChildren(...data.patterns.map((p) => el('li', { textContent: p })));
 
   const cells = [el('div'), ...HEADS.map((d) => el('div', { className: 'head', textContent: d }))];
