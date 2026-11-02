@@ -14,20 +14,22 @@ Instead of five emoji, you check in with two word clouds:
 
 Each word counts as a level from 1 (very low) to 5 (great), so the wall can be coloured just like in A. Each brick also shows the day's most picked word. Click a brick to see that day's feelings, reasons and week.
 
+There are no surprises: no gift box, no memes, no "Add a surprise" page. After checking in you just see your streak and what you picked.
+
 The design is new too: one scrolling page with a dark blue header instead of tabs.
 
 ## What's the same
 
-The random daily ping, the gift box with a teammate's meme, the private streak, the 80% team goal and minifig badge, week rows on the wall, patterns, and the rule that days with fewer than 3 answers stay grey.
+The random daily ping, the private streak, the 80% team goal and minifig badge, week rows on the wall, patterns, and the rule that days with fewer than 3 answers stay grey.
 
 ## How it works
 
 A plain static website (`index.html`, `style.css`, `app.js`) on GitHub Pages, using the same Firebase Firestore database as Version A.
 
 - B saves answers in `b_answers` (date, hour, word, reason) and check-ins in `b_checkins`, so A's and B's numbers stay apart.
-- Surprises (`memes`) and work events (`events`) are shared with Version A.
+- Work events (`events`) are shared with Version A.
 - Your streak is kept in your browser under its own `mbb-` names, so it doesn't mix with A's.
-- `firestore.rules` is the full rule set for both versions. Only words and reasons from the fixed lists are accepted. No edits, no deletes.
+- `firestore.rules` is the full rule set for both versions (A still uses the `memes` rule). Only words and reasons from the fixed lists are accepted. No edits, no deletes.
 
 ## Run it locally
 

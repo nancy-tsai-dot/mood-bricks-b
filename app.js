@@ -1,7 +1,7 @@
 'use strict';
 // Mood Bricks, Version B: check in with a feeling word and a reason instead of an emoji.
 // Everything runs in the browser; the shared team data lives in Firebase Firestore, in the same
-// project as Version A. B keeps its own answers and check-ins, and shares A's surprises and work events.
+// project as Version A. B keeps its own answers and check-ins, shares A's work events, and has no surprises.
 // The key below is public by design: firestore.rules decides what anyone can do.
 
 const PROJECT = 'mood-bricks';
@@ -16,7 +16,6 @@ const MIN_TEAM_SIZE = 5;
 const TEAM_GOAL = 0.8; // 80% of possible check-ins this month
 const WEEKS_ON_WALL = 5;
 const WEEKS_ANALYSED = 12; // patterns look at the last 12 weeks
-const MAX_IMAGE_CHARS = 940000; // one database entry holds about 1 MB
 
 // Each word counts as a level from 1 to 5, so the wall can be coloured and averaged.
 const FEELINGS = [
@@ -100,7 +99,6 @@ async function request(url, body) {
 }
 
 const addDoc = (collection, data) => request(`${DB}/${collection}?key=${API_KEY}`, { fields: toFields(data) });
-const getDoc = (collection, id) => request(`${DB}/${collection}/${id}?key=${API_KEY}`).then(fromDoc);
 
 // Lists a whole collection, fetching only the named fields.
 async function listDocs(collection, fields) {
@@ -177,61 +175,6 @@ async function checkIn(word, reason) {
     await addDoc(CHECKINS, { device: DEVICE, date: today }).catch(() => {}); // only feeds the team goal
   }
   return streakFor(days);
-}
-
-// ---------- surprises (shared with Version A) ----------
-const BUILT_IN = [
-  ['🐈‍⬛💨', 'Me leaving the 4pm meeting'],
-  ['🦆', 'Rubber duck asks: have you tried turning it off and on again?'],
-  ['🐢', 'Me waiting for the render to finish'],
-  ['🦥', 'Friday afternoon energy'],
-  ['🐕', 'Office dog approves your work'],
-  ['🦖', 'Legacy code, but make it cute'],
-].map(([emoji, caption], i) => ({ id: `built-in-${i}`, emoji, caption }));
-
-async function surprisePool() {
-  const team = await listDocs('memes', ['addedAt']);
-  return team.length ? team : BUILT_IN; // the built-in emoji only fill in while the team hasn't added any
-}
-
-// Some links people paste are web pages around an image, not the image itself. Where we can, find the image.
-function directImage(link) {
-  try {
-    const url = new URL(link);
-    // Google Images result page: the real address is inside the link.
-    if (/(^|\.)google\.[a-z.]+$/.test(url.hostname) && url.pathname === '/imgres' && url.searchParams.get('imgurl')) {
-      return url.searchParams.get('imgurl');
-    }
-    // Giphy page, e.g. giphy.com/gifs/happy-cat-AbC123: the GIF lives at media.giphy.com.
-    const giphy = /^\/gifs\/(?:.*-)?([A-Za-z0-9]+)\/?$/.exec(url.pathname);
-    if (/(^|\.)giphy\.com$/.test(url.hostname) && giphy) return `https://media.giphy.com/media/${giphy[1]}/giphy.gif`;
-  } catch { /* not a link; leave it as it is */ }
-  return link;
-}
-
-// Pasted links: add a missing https://, upgrade http://, and look through page links for the image.
-function cleanLink(text) {
-  const link = /^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`;
-  return directImage(link.replace(/^http:\/\//i, 'https://'));
-}
-
-// no-referrer: some sites refuse to show their images on other websites, and this hides which site is asking.
-const loadsAsImage = (src) => new Promise((resolve) => {
-  const img = new Image();
-  img.referrerPolicy = 'no-referrer';
-  const timer = setTimeout(() => resolve(false), 10000);
-  img.onload = () => { clearTimeout(timer); resolve(true); };
-  img.onerror = () => { clearTimeout(timer); resolve(false); };
-  img.src = src;
-});
-
-async function pickMeme() {
-  const all = await surprisePool().catch(() => BUILT_IN);
-  const last = localStorage.getItem(`${STORE}last-meme`);
-  const pool = all.length > 1 ? all.filter((m) => m.id !== last) : all;
-  const pick = pool[Math.floor(Math.random() * pool.length)];
-  localStorage.setItem(`${STORE}last-meme`, pick.id);
-  return pick.emoji ? pick : getDoc('memes', pick.id);
 }
 
 // ---------- sample data, so the wall has patterns from day one ----------
@@ -423,9 +366,6 @@ function wall(includeSample) {
 function loadMe() {
   const days = myDays();
   renderStreak(streakFor(days), days.includes(dayStr(new Date())));
-  surprisePool()
-    .then((pool) => { $('#poolCount').textContent = `${pool.length} surprises in the pool so far (shared with Version A).`; })
-    .catch(() => { $('#poolCount').textContent = ''; });
 }
 function renderStreak(streak, checkedInToday) {
   $('#streak').textContent = streak > 0 ? `🔥 ${streak}-day streak` : 'No streak yet';
@@ -457,7 +397,7 @@ function checkPing() {
   $('#pingInfo').textContent = isWeekendToday()
     ? 'It’s the weekend. No pings today 🌴'
     : pingDone()
-      ? 'Today’s surprise ping has been. Come back tomorrow, or check in again with the button.'
+      ? 'Today’s ping has been. Come back tomorrow, or check in again with the button.'
       : 'Today’s ping is hiding somewhere between 9:00 and 17:00 🤫';
 }
 
@@ -487,9 +427,7 @@ function askReason(word) {
 }
 
 function openPing() {
-  $('#gift').replaceChildren(el('span', { className: 'box', textContent: '🎁' }));
-  $('#gift').className = 'gift waiting';
-  $('#giftCap').textContent = 'Something from your team is inside…';
+  $('#askMsg').textContent = '';
   $('#askBlock').hidden = false;
   $('#doneBlock').hidden = true;
   $('#ping').hidden = false;
@@ -504,41 +442,16 @@ async function answer(word, reason) {
   try {
     streak = await checkIn(word, reason);
   } catch (err) {
-    $('#giftCap').textContent = err.message;
+    $('#askMsg').textContent = err.message;
     buttons.forEach((b) => { b.disabled = false; });
     return;
   }
-  $('#gift').classList.add('opening');
-  const [meme] = await Promise.all([pickMeme().catch(() => null), new Promise((r) => setTimeout(r, 650))]);
-  reveal(meme);
   $('#askBlock').hidden = true;
   $('#thanks').textContent = `Thanks! 🔥 ${streak}-day streak`;
   $('#picked').textContent = `You picked ${word} · ${reason}`;
   $('#doneBlock').hidden = false;
   $('#doneBtn').focus();
   loadWall();
-}
-
-function reveal(meme) {
-  const gift = $('#gift');
-  gift.classList.remove('opening', 'waiting');
-  gift.classList.add('open');
-  if (!meme) {
-    gift.replaceChildren(el('span', { className: 'emoji-meme', textContent: '🎉' }));
-    $('#giftCap').textContent = 'Your answer is in. The surprise didn’t load this time.';
-    return;
-  }
-  if (meme.emoji) {
-    gift.replaceChildren(el('span', { className: 'emoji-meme', textContent: meme.emoji }));
-  } else {
-    const img = el('img', { referrerPolicy: 'no-referrer', src: directImage(meme.src), alt: meme.caption || 'A surprise from your team' });
-    img.onerror = () => {
-      gift.replaceChildren(el('span', { className: 'emoji-meme', textContent: '🙈' }));
-      $('#giftCap').textContent = 'This surprise didn’t load. The link might not be a direct image.';
-    };
-    gift.replaceChildren(img);
-  }
-  $('#giftCap').textContent = meme.caption ? `“${meme.caption}”` : 'From a teammate';
 }
 
 $('#pingNow').addEventListener('click', openPing);
@@ -713,69 +626,6 @@ $('#eventForm').addEventListener('submit', async (e) => {
     loadWall();
   } catch (err) {
     $('#eventMsg').textContent = err.message;
-  }
-});
-
-// ---------- add a surprise ----------
-const readAsDataUrl = (file) => new Promise((resolve, reject) => {
-  const reader = new FileReader();
-  reader.onload = () => resolve(reader.result);
-  reader.onerror = () => reject(new Error('Could not read that file.'));
-  reader.readAsDataURL(file);
-});
-
-// Big photos are scaled down to fit in the database. GIFs can't be, or they'd stop moving.
-async function imageForUpload(file) {
-  const original = await readAsDataUrl(file);
-  if (original.length <= MAX_IMAGE_CHARS) return original;
-  if (file.type === 'image/gif') throw new Error('That GIF is too big to upload (max about 700 KB). Paste a link to it instead.');
-  const img = await createImageBitmap(file);
-  const scale = Math.min(1, 1000 / Math.max(img.width, img.height));
-  const canvas = el('canvas', { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
-  const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  const small = canvas.toDataURL('image/jpeg', 0.82);
-  if (small.length > MAX_IMAGE_CHARS) throw new Error('That image is too big to upload. Paste a link to it instead.');
-  return small;
-}
-
-$('#memeForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const form = e.target;
-  const msg = $('#memeMsg');
-  const file = form.file.files[0];
-  const pasted = form.url.value.trim();
-  try {
-    if (!file && !pasted) throw new Error('Paste a link or choose an image.');
-    if (file && !/^image\/(png|jpeg|gif|webp)$/.test(file.type)) throw new Error('Only PNG, JPG, GIF or WebP images, please.');
-    msg.textContent = 'Adding…';
-    let src;
-    if (file) {
-      src = await imageForUpload(file);
-    } else if (/^data:image\//i.test(pasted)) {
-      // "Copy image address" on Google Images often copies the image itself as text, not a link.
-      src = pasted.replace(/\s+/g, '');
-      if (!/^data:image\/(png|jpeg|gif|webp);base64,[A-Za-z0-9+/=]+$/.test(src)) throw new Error('Only PNG, JPG, GIF or WebP images, please.');
-      if (src.length > MAX_IMAGE_CHARS) throw new Error('That image is too big. Save it and upload the file instead.');
-    } else {
-      src = cleanLink(pasted);
-      let link;
-      try { link = new URL(src); } catch { throw new Error('That doesn’t look like a link. Paste an image address, like https://…/cat.gif'); }
-      if (/(^|\.)tenor\.com$/.test(link.hostname) && !/\.(gif|webp|png|jpe?g)$/i.test(link.pathname)) {
-        throw new Error('That’s a Tenor page, not the GIF. Right-click the GIF and choose "Copy image address".');
-      }
-      if (!(await loadsAsImage(src))) {
-        throw new Error('That link didn’t load as an image. Right-click the image itself and choose "Copy image address", or save it and upload the file.');
-      }
-    }
-    await addDoc('memes', { src, caption: form.caption.value.trim().slice(0, 80), addedAt: dayStr(new Date()) });
-    form.reset();
-    msg.textContent = 'Added! Someone will unwrap it after their next check-in 🎁';
-    loadMe();
-  } catch (err) {
-    msg.textContent = err.message;
   }
 });
 

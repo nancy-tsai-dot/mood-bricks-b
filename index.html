@@ -13,7 +13,6 @@
       <nav class="jump" aria-label="Sections">
         <a href="#me">Check in</a>
         <a href="#wall">Team wall</a>
-        <a href="#add">Add a surprise</a>
       </nav>
     </div>
   </header>
@@ -62,29 +61,6 @@
       </div>
     </section>
 
-    <section class="section" id="add">
-      <h2>Add a surprise</h2>
-      <p class="muted">A funny animal, a work meme or a cat GIF. Teammates only get to see it after they check in.</p>
-      <div class="card">
-        <form id="memeForm" class="stack">
-          <label>Image or GIF link
-            <input name="url" type="text" inputmode="url" autocomplete="off" placeholder="https://…/funny-cat.gif">
-          </label>
-          <p class="muted small">Tip: right-click a GIF and choose "Copy image address". Links work best for big GIFs.</p>
-          <div class="or">or</div>
-          <label>Upload an image (GIFs up to about 700 KB)
-            <input type="file" name="file" accept="image/png,image/jpeg,image/gif,image/webp">
-          </label>
-          <label>Caption (optional)
-            <input name="caption" maxlength="80" placeholder="Me when the build passes">
-          </label>
-          <button class="btn primary">Add to the surprise pool</button>
-          <p class="msg" id="memeMsg" role="status"></p>
-        </form>
-        <p class="muted small" id="poolCount"></p>
-      </div>
-    </section>
-
     <p class="muted small footer">Anonymous: no names, no logins. Anyone with this link can add answers. A workshop prototype from Imaginarium.</p>
   </main>
 
@@ -107,13 +83,12 @@
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pingTitle">
       <button class="close" id="pingClose" aria-label="Close">×</button>
       <p class="wild" id="pingTitle">A wild check-in appeared!</p>
-      <div class="gift waiting" id="gift"></div>
-      <p class="cap" id="giftCap"></p>
       <div id="askBlock">
         <p class="step" id="stepLabel"></p>
         <p class="q" id="question" tabindex="-1"></p>
         <div class="cloud" id="cloud"></div>
         <button type="button" class="link" id="backBtn" hidden>← Pick a different word</button>
+        <p class="msg" id="askMsg" role="status"></p>
       </div>
       <div id="doneBlock" hidden>
         <p class="thanks" id="thanks"></p>
