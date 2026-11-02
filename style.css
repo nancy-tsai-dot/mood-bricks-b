@@ -72,7 +72,18 @@ main { max-width: 880px; margin: 0 auto; padding: 0 16px; }
 .insight { padding: 28px; }
 .insight h2 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--bright-blue); margin-bottom: 8px; }
 .insight-text { font-size: 28px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em; margin-bottom: 8px; }
-.insight h3 { font-size: 16px; margin: 22px 0 8px; padding-top: 18px; border-top: 1px solid var(--stroke); }
+.more { margin-top: 22px; border-top: 1px solid var(--stroke); } /* closed by default; the browser handles open and close */
+.more summary {
+  display: flex; align-items: center; justify-content: space-between; list-style: none; cursor: pointer;
+  font-weight: 700; font-size: 16px; padding: 18px 0 2px;
+}
+.more summary::-webkit-details-marker { display: none; }
+.more summary::after { /* the chevron: points down when closed, up when open */
+  content: ""; width: 9px; height: 9px; margin: 0 6px 4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(45deg); transition: transform .2s;
+}
+.more[open] summary::after { transform: rotate(-135deg); margin-bottom: -4px; }
+.more .patterns { margin-top: 10px; }
 .sample-note { color: var(--muted); background: #fff6c2; border-radius: 8px; padding: 6px 10px; display: inline-block; }
 
 /* ---------- buttons and forms ---------- */
