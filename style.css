@@ -153,14 +153,10 @@ button.brick:hover { filter: brightness(1.08); transform: translateY(-1px); }
 .cloud { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 10px 12px; max-width: 640px; margin: 0 auto; }
 .word {
   font: inherit; font-weight: 600; color: var(--navy); background: var(--surface); cursor: pointer;
-  border: 2px solid #c6d3e1; border-radius: 999px; padding: 8px 16px; line-height: 1.2;
+  font-size: 18px; border: 2px solid #c6d3e1; border-radius: 999px; padding: 8px 16px; line-height: 1.2;
   transition: transform .12s, background .12s, border-color .12s;
 }
-.word.s1 { font-size: 15px; }
-.word.s2 { font-size: 18px; }
-.word.s3 { font-size: 22px; padding: 10px 20px; }
-.word:nth-child(3n + 2) { transform: translateY(6px); } /* a little unevenness, so it reads as a cloud, not a list */
-.word:nth-child(4n + 1) { transform: translateY(-4px); }
+/* Every word looks the same, so none is more suggestive than another. */
 .word:hover:not(:disabled), .word:focus-visible { background: #fff6c2; border-color: var(--bright-yellow); transform: translateY(-2px) scale(1.04); }
 .word:disabled { opacity: .5; cursor: default; }
 .link { margin-top: 18px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--bright-blue); cursor: pointer; padding: 6px; }
@@ -212,7 +208,5 @@ button.brick:hover { filter: brightness(1.08); transform: translateY(-1px); }
   .mix-row { grid-template-columns: 120px minmax(0, 1fr); }
   .modal { padding: 24px 16px 18px; }
   .q { font-size: 19px; }
-  .word.s1 { font-size: 14px; }
-  .word.s2 { font-size: 16px; }
-  .word.s3 { font-size: 18px; padding: 8px 16px; }
+    .word { font-size: 16px; }
 }

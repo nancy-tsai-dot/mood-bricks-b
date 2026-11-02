@@ -1,6 +1,6 @@
-# 🧱 Mood Bricks · Version B
+# 🧭 Mood Journey · Version B
 
-Version B of an A/B test of Mood Bricks, an anonymous check-in game for a team, made at the LEGO Imaginarium workshop on Creative Dividends.
+Version B of an A/B test of Mood Bricks (Version B is called Mood Journey), an anonymous check-in game for a team, made at the LEGO Imaginarium workshop on Creative Dividends.
 
 **Try it:** https://nancy-tsai-dot.github.io/mood-bricks-b/
 **Version A (emoji):** https://nancy-tsai-dot.github.io/mood-bricks/

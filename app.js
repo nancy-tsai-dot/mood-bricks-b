@@ -1,5 +1,5 @@
 'use strict';
-// Mood Bricks, Version B: check in with a feeling word and a reason instead of an emoji.
+// Mood Journey (Version B of Mood Bricks): check in with a feeling word and a reason instead of an emoji.
 // Everything runs in the browser; the shared team data lives in Firebase Firestore, in the same
 // project as Version A. B keeps its own answers and check-ins, shares A's work events, and has no surprises.
 // The key below is public by design: firestore.rules decides what anyone can do.
@@ -401,11 +401,10 @@ function checkPing() {
       : 'Today’s ping is hiding somewhere between 9:00 and 17:00 🤫';
 }
 
-// A word cloud: the same pill buttons, in a shuffled order so no word always comes first.
-const SIZES = ['s2', 's1', 's3', 's1', 's2', 's3', 's1'];
+// A word cloud: identical pill buttons, in a shuffled order so no word always comes first.
 function cloud(words, onPick) {
-  $('#cloud').replaceChildren(...words.map((w, i) => el('button', {
-    type: 'button', className: `word ${SIZES[i % SIZES.length]}`, textContent: w, onclick: () => onPick(w),
+  $('#cloud').replaceChildren(...words.map((w) => el('button', {
+    type: 'button', className: 'word', textContent: w, onclick: () => onPick(w),
   })));
   $('#question').focus(); // not the first word, so no word looks picked already
 }
