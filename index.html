@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mood Bricks · Version B</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">🧱 Mood Bricks <span class="version">Version B</span></div>
+      <nav class="jump" aria-label="Sections">
+        <a href="#me">Check in</a>
+        <a href="#wall">Team wall</a>
+        <a href="#add">Add a surprise</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" id="me">
+    <div class="hero-inner">
+      <p class="private">Only you can see this. It's saved in this browser.</p>
+      <p class="streak" id="streak">…</p>
+      <p class="hero-sub" id="streakSub"></p>
+      <button class="btn yellow" id="pingNow">Check in now</button>
+      <p class="hero-ping" id="pingInfo"></p>
+      <p class="hero-note">Keep this page open in a tab. A check-in pops up once a day at a random time, so you're not always asked at 9am.</p>
+    </div>
+  </section>
+
+  <main>
+    <section class="section" id="wall">
+      <h2>Team brick wall</h2>
+      <p class="muted">Each brick is one workday. Its colour is the team's average feeling and its word is the one picked most. Days with fewer than <span id="minAnswers">3</span> answers stay grey, so nobody can be singled out. Click a coloured brick to see that day up close.</p>
+      <label class="check"><input type="checkbox" id="showSample" checked> Include sample data</label>
+      <div class="card">
+        <div id="wallGrid" class="wall" aria-label="Team feelings by day"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="two">
+        <div class="card">
+          <h3>Patterns noticed</h3>
+          <ul id="patterns" class="patterns"></ul>
+        </div>
+        <div class="card">
+          <h3>Team goal this month</h3>
+          <p id="goalText"></p>
+          <div class="bar"><div id="goalBar"></div><span class="target" id="goalTarget"></span></div>
+          <p class="muted small" id="goalSub"></p>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Add a work event</h3>
+        <p class="muted">Releases, deadlines, sprint starts. They show on the wall so you can see how work affects how people feel.</p>
+        <form id="eventForm" class="row">
+          <input type="date" name="date" required aria-label="Date">
+          <input name="label" placeholder="e.g. Release" maxlength="30" required aria-label="Event name">
+          <button class="btn">Add</button>
+        </form>
+        <p class="msg" id="eventMsg" role="status"></p>
+      </div>
+    </section>
+
+    <section class="section" id="add">
+      <h2>Add a surprise</h2>
+      <p class="muted">A funny animal, a work meme or a cat GIF. Teammates only get to see it after they check in.</p>
+      <div class="card">
+        <form id="memeForm" class="stack">
+          <label>Image or GIF link
+            <input name="url" type="text" inputmode="url" autocomplete="off" placeholder="https://…/funny-cat.gif">
+          </label>
+          <p class="muted small">Tip: right-click a GIF and choose "Copy image address". Links work best for big GIFs.</p>
+          <div class="or">or</div>
+          <label>Upload an image (GIFs up to about 700 KB)
+            <input type="file" name="file" accept="image/png,image/jpeg,image/gif,image/webp">
+          </label>
+          <label>Caption (optional)
+            <input name="caption" maxlength="80" placeholder="Me when the build passes">
+          </label>
+          <button class="btn primary">Add to the surprise pool</button>
+          <p class="msg" id="memeMsg" role="status"></p>
+        </form>
+        <p class="muted small" id="poolCount"></p>
+      </div>
+    </section>
+
+    <p class="muted small footer">Anonymous: no names, no logins. Anyone with this link can add answers. A workshop prototype from Imaginarium.</p>
+  </main>
+
+  <div class="overlay" id="day" hidden>
+    <div class="modal day" role="dialog" aria-modal="true" aria-labelledby="dayTitle">
+      <button class="close" id="dayClose" aria-label="Close">×</button>
+      <p class="day-title" id="dayTitle"></p>
+      <div class="day-events" id="dayEvents"></div>
+      <p class="day-top" id="dayTop"></p>
+      <h3>Feelings</h3>
+      <div id="dayFeelings"></div>
+      <h3>Reasons</h3>
+      <div id="dayReasons"></div>
+      <h3>That week</h3>
+      <div class="week-chart" id="dayWeek"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="ping" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="pingTitle">
+      <button class="close" id="pingClose" aria-label="Close">×</button>
+      <p class="wild" id="pingTitle">A wild check-in appeared!</p>
+      <div class="gift waiting" id="gift"></div>
+      <p class="cap" id="giftCap"></p>
+      <div id="askBlock">
+        <p class="step" id="stepLabel"></p>
+        <p class="q" id="question" tabindex="-1"></p>
+        <div class="cloud" id="cloud"></div>
+        <button type="button" class="link" id="backBtn" hidden>← Pick a different word</button>
+      </div>
+      <div id="doneBlock" hidden>
+        <p class="thanks" id="thanks"></p>
+        <p class="muted" id="picked"></p>
+        <button class="btn primary" id="doneBtn">Back to work</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
