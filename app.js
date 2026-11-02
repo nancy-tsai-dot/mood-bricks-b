@@ -175,9 +175,9 @@ function nearEvents(events) {
   return near;
 }
 
-// Up to 3 short patterns, the most useful first.
+// Up to 3 patterns, one short sentence each, the most useful first.
 function findPatterns(answers, events) {
-  if (answers.length < 8) return ['Check in for 2 weeks to see patterns.'];
+  if (answers.length < 8) return ['Keep checking in for about 2 weeks and your patterns will show up here.'];
   const out = [];
   const overall = mean(answers.map((a) => a.score));
   const byWeekday = {};
@@ -187,13 +187,13 @@ function findPatterns(answers, events) {
   const lows = answers.filter((a) => a.score <= 3);
   if (lows.length >= 4) {
     const [reason, n] = counts(lows.map((a) => a.reason))[0];
-    out.push(`Low days: mostly ${lowerFirst(short(reason))}.`);
+    out.push(`Most of your low days come down to ${lowerFirst(short(reason))}.`);
     const share = n / answers.length;
     const peak = Object.entries(byWeekday)
       .filter(([, v]) => v.length >= 3)
       .map(([wd, v]) => ({ wd: Number(wd), hits: v.filter((a) => a.reason === reason).length, total: v.length }))
       .sort((a, b) => b.hits / b.total - a.hits / a.total)[0];
-    if (peak && peak.hits >= 2 && peak.hits / peak.total >= share * 1.5) out.push(`Peak ${lowerFirst(short(reason))}: ${WEEKDAYS[peak.wd]}s.`);
+    if (peak && peak.hits >= 2 && peak.hits / peak.total >= share * 1.5) out.push(`“${short(reason)}” comes up most on ${WEEKDAYS[peak.wd]}s.`);
   }
 
   const weekdays = Object.entries(byWeekday)
@@ -201,7 +201,7 @@ function findPatterns(answers, events) {
     .map(([wd, v]) => ({ wd: Number(wd), avg: mean(v.map((a) => a.score)) }));
   const low = weekdays.length >= 3 ? weekdays.reduce((a, b) => (b.avg < a.avg ? b : a)) : null;
   const high = weekdays.length >= 3 ? weekdays.reduce((a, b) => (b.avg > a.avg ? b : a)) : null;
-  if (low && overall - low.avg >= 0.3) out.push(`Toughest day: ${WEEKDAYS[low.wd]}.`);
+  if (low && overall - low.avg >= 0.3) out.push(`${WEEKDAYS[low.wd]} is usually your toughest day of the week.`);
 
   const days = [...new Set(answers.map((a) => a.date))].sort();
   const recent = new Set(days.slice(-10));
@@ -209,8 +209,8 @@ function findPatterns(answers, events) {
   if (before.size >= 5) {
     const r = mean(answers.filter((a) => recent.has(a.date)).map((a) => a.score));
     const b = mean(answers.filter((a) => before.has(a.date)).map((a) => a.score));
-    if (r - b >= 0.3) out.push('Trending up.');
-    if (b - r >= 0.3) out.push('Trending down.');
+    if (r - b >= 0.3) out.push('You’ve been feeling better over the last two weeks.');
+    if (b - r >= 0.3) out.push('You’ve been feeling worse over the last two weeks.');
   }
 
   if (events.length) {
@@ -219,22 +219,22 @@ function findPatterns(answers, events) {
     const others = answers.filter((a) => !near.has(a.date)).map((a) => a.score);
     if (nearOnes.length >= 3 && others.length >= 3) {
       const diff = mean(others) - mean(nearOnes);
-      if (diff >= 0.3) out.push('Events drag you down.');
-      if (diff <= -0.3) out.push('Events lift you.');
+      if (diff >= 0.3) out.push('You feel lower in the days around your events.');
+      if (diff <= -0.3) out.push('You feel better in the days around your events.');
     }
   }
 
-  if (high && high.avg - overall >= 0.3) out.push(`Best day: ${WEEKDAYS[high.wd]}.`);
+  if (high && high.avg - overall >= 0.3) out.push(`${WEEKDAYS[high.wd]} is usually your best day of the week.`);
 
   const morning = answers.filter((a) => a.hour < 12).map((a) => a.score);
   const afternoon = answers.filter((a) => a.hour >= 12).map((a) => a.score);
   if (morning.length >= 3 && afternoon.length >= 3) {
     const diff = mean(morning) - mean(afternoon);
-    if (diff >= 0.3) out.push('Mornings beat afternoons.');
-    if (diff <= -0.3) out.push('Afternoons beat mornings.');
+    if (diff >= 0.3) out.push('You tend to feel better in the mornings than in the afternoons.');
+    if (diff <= -0.3) out.push('You tend to feel better in the afternoons than in the mornings.');
   }
 
-  out.push(`Most often: ${counts(answers.map((a) => a.word))[0][0]}.`);
+  out.push(`${counts(answers.map((a) => a.word))[0][0]} is the feeling you pick most often.`);
   return out.slice(0, 3);
 }
 
