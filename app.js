@@ -1,5 +1,5 @@
 'use strict';
-// Mood Journey (Version B of Mood Bricks): a private mood journal. Check in with a feeling word and a reason.
+// Burnarater (Version B of Mood Bricks): a private mood journal. Check in with a feeling word and a reason.
 // Everything is saved only in this browser (localStorage). Nothing is sent anywhere, and there is no team view.
 
 const STORE = 'mbb-'; // A and B share a web address, so B's browser storage gets its own prefix

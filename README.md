@@ -1,6 +1,6 @@
-# 🧭 Mood Journey · Version B
+# 🔥 Burnarater · Version B
 
-Version B of an A/B test of Mood Bricks (Version B is called Mood Journey), made at the LEGO Imaginarium workshop on Creative Dividends.
+Version B of an A/B test of Mood Bricks (Version B is called Burnarater), made at the LEGO Imaginarium workshop on Creative Dividends.
 
 **Try it:** https://nancy-tsai-dot.github.io/mood-bricks-b/
 **Version A (emoji, team wall):** https://nancy-tsai-dot.github.io/mood-bricks/
@@ -35,3 +35,5 @@ A plain static website (`index.html`, `style.css`, `app.js`) on GitHub Pages. Yo
 ## Run it locally
 
 Open the folder with any static web server, e.g. `python3 -m http.server 8000`, then go to http://localhost:8000.
+
+The font is [Fredoka](https://fonts.google.com/specimen/Fredoka), saved in `fonts/` under the SIL Open Font License (`fonts/OFL.txt`), so the page makes no outside requests.
