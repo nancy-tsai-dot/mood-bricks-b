@@ -339,7 +339,7 @@ function pingTime() {
   if (!t) {
     const nine = new Date();
     nine.setHours(9, 0, 0, 0);
-    t = nine.getTime() + Math.floor(Math.random() * 8 * 3600 * 1000); // somewhere between 9:00 and 17:00
+    t = nine.getTime() + Math.floor(Math.random() * 7 * 3600 * 1000); // somewhere between 9:00 and 16:00
     localStorage.setItem(key, String(t));
   }
   return t;
@@ -355,7 +355,7 @@ function checkPing() {
     ? 'It’s the weekend. No pings today 🌴'
     : pingDone()
       ? 'Today’s ping has been. Come back tomorrow, or check in again with the button.'
-      : 'Today’s ping is hiding somewhere between 9:00 and 17:00 🤫';
+      : 'Today’s ping is hiding somewhere between 9:00 and 16:00 🤫';
 }
 
 // A word cloud: identical pill buttons, in a shuffled order so no word always comes first.
